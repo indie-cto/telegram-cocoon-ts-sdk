@@ -1,222 +1,82 @@
-# Claude Code Project Template
+# Cocoon TypeScript SDK
 
-A template repository for Claude Code projects following best practices from Boris Cherny (creator of Claude Code) and Anthropic's official recommendations.
+TypeScript SDK for [Telegram Cocoon](https://github.com/TelegramMessenger/cocoon) — decentralized GPU network for AI inference on TON blockchain.
+
+Provides an **OpenAI-compatible API** over Cocoon's binary TL protocol.
+
+## Install
+
+```bash
+npm install cocoon-sdk
+```
 
 ## Quick Start
 
-### Option 1: Use as GitHub Template (Recommended)
+```typescript
+import { Cocoon } from 'cocoon-sdk';
 
-1. Click **"Use this template"** → **"Create a new repository"** on GitHub
-2. Name your new repository and create it
-3. Clone your new repo:
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/YOUR_NEW_REPO.git
-   cd YOUR_NEW_REPO
-   ```
+const client = new Cocoon({
+  wallet: 'your 24 word mnemonic phrase here ...',
+  network: 'mainnet',
+});
 
-### Option 2: Fork the Repository
+// Chat completion (non-streaming)
+const response = await client.chat.completions.create({
+  model: 'deepseek-r1',
+  messages: [{ role: 'user', content: 'Hello!' }],
+});
 
-1. Click **"Fork"** on GitHub
-2. Clone your fork:
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/claude-code-template.git
-   cd claude-code-template
-   ```
-
-### Option 3: Manual Clone (No GitHub)
-
-```bash
-# Clone the template
-git clone https://github.com/ORIGINAL_OWNER/claude-code-template.git my-project
-cd my-project
-
-# Remove original git history and start fresh
-rm -rf .git
-git init
-git add .
-git commit -m "Initial commit from claude-code-template"
+console.log(response.choices[0].message.content);
 ```
 
-### After Creating Your Project
+## Streaming
 
-1. **Edit `CLAUDE.md`** - Replace placeholders with your project details:
-   - Project overview and description
-   - Tech stack (language, framework, database)
-   - Development commands (install, test, build, lint)
-   - File organization structure
+```typescript
+const stream = await client.chat.completions.create({
+  model: 'llama-3.1-70b',
+  messages: [{ role: 'user', content: 'Write a poem about the moon' }],
+  stream: true,
+});
 
-2. **Customize `.claude/settings.json`** - Update allowed commands for your stack:
-   ```json
-   "allow": [
-     "Bash(npm test*)",    // or pytest, go test, etc.
-     "Bash(npm run lint*)" // or ruff, golangci-lint, etc.
-   ]
-   ```
-
-3. **Configure MCP servers** (optional) - Edit `.mcp.json` if you need external integrations
-
-4. **Start Claude Code**:
-   ```bash
-   claude
-   ```
-
-## Template Structure
-
-```
-.
-├── CLAUDE.md              # Project context for Claude
-├── .claude/
-│   ├── settings.json      # Permissions and hooks configuration
-│   └── commands/          # Custom slash commands
-│       ├── commit-push-pr.md
-│       ├── fix-tests.md
-│       └── verify.md
-├── .mcp.json              # MCP server configuration (optional)
-├── .tmux.conf             # tmux configuration for VPS/remote development
-├── .gitignore
-└── README.md
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0]?.delta?.content || '');
+}
 ```
 
-## Files Explained
+## List Models
 
-### CLAUDE.md
-
-The main context file that Claude reads at the start of every conversation. Include:
-
-- Project overview and tech stack
-- Development commands (build, test, lint)
-- Code style conventions
-- Common mistakes to avoid (your "institutional memory")
-- Architecture notes
-
-**Key practice**: When Claude makes a mistake, add it to CLAUDE.md so it doesn't repeat it.
-
-### .claude/settings.json
-
-Pre-approved commands and hooks:
-
-- **permissions.allow**: Commands Claude can run without asking
-- **hooks.PostToolUse**: Auto-run commands after file edits (e.g., formatting)
-
-### .claude/commands/
-
-Custom slash commands for repetitive workflows. Use with `/command-name`.
-
-Included commands:
-- `/commit-push-pr` - Commit, push, and create a PR
-- `/verify` - Run all checks (lint, typecheck, test, build)
-- `/fix-tests` - Analyze and fix failing tests
-
-### .mcp.json
-
-Connect external tools via MCP (Model Context Protocol). Examples:
-- Puppeteer for browser automation
-- Slack integration
-- Database queries
-
-### .tmux.conf
-
-Optimized tmux configuration for remote development. Copy to your home directory:
-```bash
-cp .tmux.conf ~/.tmux.conf
+```typescript
+const models = await client.models.list();
+for (const model of models.data) {
+  console.log(`${model.id} — ${model.active_workers} workers`);
+}
 ```
 
-## Best Practices
+## Configuration
 
-### From Boris Cherny
-
-1. **Use Plan Mode** (Shift+Tab twice) - Iterate on the plan before coding
-2. **Verify your work** - Give Claude ways to check its output (tests, linting)
-3. **Build institutional memory** - Add mistakes to CLAUDE.md
-4. **Use slash commands** - Codify repetitive workflows
-5. **Auto-format with hooks** - Prevent CI failures from formatting issues
-
-### From Anthropic
-
-1. **Be specific** - Detailed instructions yield better first attempts
-2. **Use /clear frequently** - Reset context between distinct tasks
-3. **Explore-Plan-Code-Commit** - Read code first, plan, then implement
-4. **Run parallel instances** - One writes code, another reviews
-
-## Customization
-
-### For Different Tech Stacks
-
-Edit `.claude/settings.json` permissions:
-
-**Python:**
-```json
-"allow": [
-  "Bash(pip install*)",
-  "Bash(pytest*)",
-  "Bash(ruff*)",
-  "Bash(mypy*)"
-]
+```typescript
+const client = new Cocoon({
+  wallet: 'your 24 word mnemonic ...',   // Required
+  network: 'mainnet',                     // 'mainnet' | 'testnet' (default: 'mainnet')
+  proxyUrl: 'host:port',                  // Direct proxy (bypasses discovery)
+  timeout: 120_000,                       // Request timeout in ms (default: 120s)
+});
 ```
 
-**Go:**
-```json
-"allow": [
-  "Bash(go build*)",
-  "Bash(go test*)",
-  "Bash(go run*)",
-  "Bash(golangci-lint*)"
-]
-```
+## Prerequisites
 
-### Adding Team Commands
+- **Node.js** >= 18
+- A **TON wallet** with sufficient balance for inference requests
+- The wallet must be registered with a Cocoon proxy (see [Cocoon docs](https://github.com/TelegramMessenger/cocoon/blob/main/docs/smart-contracts.md))
 
-Create `.claude/commands/your-command.md`:
+## How It Works
 
-```markdown
-# Command Title
+1. SDK connects to a Cocoon proxy via TCP/TLS
+2. Performs handshake and authentication using the TL binary protocol
+3. Sends inference requests as TL-serialized HTTP requests
+4. Receives streaming responses via `queryAnswerPartEx` + `queryAnswerEx`
+5. Parses responses into OpenAI-compatible types
 
-Description of what this command does.
+## License
 
-## Instructions
-
-1. Step one
-2. Step two
-
-$ARGUMENTS
-```
-
-## Remote Development (VPS)
-
-If you're developing on a VPS or remote server, use tmux to keep Claude Code running if your connection drops.
-
-### Setup
-
-```bash
-# Copy the included tmux config
-cp .tmux.conf ~/.tmux.conf
-
-# Start a new tmux session
-tmux new -s dev
-```
-
-### Daily Workflow
-
-```bash
-# Start a new session (first time)
-tmux new -s dev
-
-# Detach from session (keeps running): Ctrl+b then d
-
-# Reattach later
-tmux attach -t dev
-
-# List sessions
-tmux ls
-```
-
-### Why tmux?
-
-- **Session persistence** - SSH drops won't kill your Claude Code session
-- **Multiple panes** - Run Claude in one pane, tests/logs in another
-- **Detach/reattach** - Start a long task, disconnect, come back later
-
-## Resources
-
-- [Claude Code Best Practices (Anthropic)](https://www.anthropic.com/engineering/claude-code-best-practices)
-- [How Boris Cherny Uses Claude Code](https://paddo.dev/blog/how-boris-uses-claude-code/)
+MIT
