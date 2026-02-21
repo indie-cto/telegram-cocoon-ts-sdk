@@ -1,0 +1,68 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit",
+      "Write",
+      "Bash(npx tsc*)",
+      "Bash(npx prettier*)",
+      "Bash(npx eslint*)",
+      "Bash(npx jest*)",
+      "Bash(npx vitest*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run test:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npm run dev)",
+      "Bash(npm install)",
+      "Bash(git status)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch*)",
+      "Bash(git checkout*)",
+      "Bash(git switch*)",
+      "Bash(git fetch*)",
+      "Bash(git pull*)",
+      "Bash(git stash*)",
+      "Bash(git show*)",
+      "Bash(git remote*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git add* && git commit*)",
+      "Bash(git push*)",
+      "Bash(gh pr create*)",
+      "Bash(gh pr view*)",
+      "Bash(gh pr list*)",
+      "Bash(gh pr checkout*)",
+      "Bash(gh pr diff*)",
+      "Bash(gh pr status*)",
+      "Bash(gh issue *)",
+      "Bash(gh repo *)",
+      "Bash(gh api *)",
+      "Bash(gh browse*)",
+      "Bash(gh gist *)",
+      "Bash(gh release *)",
+      "Bash(gh run *)",
+      "Bash(gh workflow *)",
+      "Bash(gh auth status*)",
+      "Bash(gh status*)",
+      "Bash(tree:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(ls:*)"
+    ],
+    "deny": []
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npm run format --silent 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}
