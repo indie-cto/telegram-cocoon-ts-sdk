@@ -2,112 +2,106 @@
 
 ## Project Overview
 
-<!-- Describe your project here -->
-This is a [PROJECT_TYPE] project that [BRIEF_DESCRIPTION].
+TypeScript SDK for Telegram Cocoon — decentralized GPU network for AI inference on TON blockchain.
+Provides an OpenAI-compatible API over Cocoon's binary TL protocol.
 
 ## Tech Stack
 
-- **Language**: [e.g., TypeScript, Python, Go]
-- **Framework**: [e.g., React, FastAPI, Express]
-- **Database**: [e.g., PostgreSQL, MongoDB]
-- **Testing**: [e.g., Jest, Pytest, Go test]
+- **Language**: TypeScript (strict mode)
+- **Runtime**: Node.js >= 18
+- **Build**: tsup (CJS + ESM + d.ts)
+- **Testing**: Vitest
+- **Blockchain**: TON (@ton/ton, @ton/core, @ton/crypto)
+- **Protocol**: Custom binary TL over TCP/TLS
 
 ## Development Commands
 
 ```bash
-# Install dependencies
-[npm install | pip install -r requirements.txt | go mod download]
+npm install          # Install dependencies
+npm run build        # Build CJS + ESM + d.ts
+npm run test         # Run tests
+npm run typecheck    # TypeScript type checking
+npm run lint         # ESLint
+npm run format       # Prettier
+```
 
-# Run development server
-[npm run dev | python main.py | go run .]
+## File Organization
 
-# Run tests
-[npm test | pytest | go test ./...]
-
-# Build for production
-[npm run build | python -m build | go build]
-
-# Lint/Format
-[npm run lint | ruff check . | golangci-lint run]
-
-# Type check
-[npm run typecheck | mypy . | go vet ./...]
+```
+src/
+  index.ts                      # Public exports
+  client.ts                     # Cocoon class (main entry point)
+  core/
+    error.ts                    # Error classes
+    streaming.ts                # Stream<T> async iterable
+    tl/
+      schema.ts                 # TL constructor IDs and field definitions
+      serializer.ts             # JS objects → TL binary
+      deserializer.ts           # TL binary → JS objects
+      types.ts                  # TypeScript interfaces for TL objects
+    protocol/
+      connection.ts             # TCP/TLS with framing [size][seqno][payload]
+      handshake.ts              # tcp_connect + client_connectToProxy
+      session.ts                # Auth, keepalive, query dispatch
+  resources/
+    chat/completions.ts         # chat.completions.create()
+    models/models.ts            # models.list()
+  types/
+    chat.ts                     # OpenAI-compatible chat types
+    models.ts                   # Model types
+    common.ts                   # Usage, FinishReason
+  ton/
+    wallet.ts                   # MnemonicWallet
+    discovery.ts                # Root Contract → proxy discovery
+    contracts/
+      root.ts                   # CocoonRoot wrapper
+      client-contract.ts        # CocoonClient registration
+tests/
+  unit/
+    tl-serializer.test.ts       # TL round-trip tests
+    streaming.test.ts           # Stream<T> tests
 ```
 
 ## Code Style & Conventions
 
-### General Rules
-
-- Follow existing code patterns in the codebase
-- Keep functions small and focused (single responsibility)
-- Use meaningful variable and function names
-- Write self-documenting code; add comments only when logic isn't obvious
-
-### File Organization
-
-<!-- Describe your project structure -->
-```
-src/
-  components/    # UI components
-  services/      # Business logic
-  utils/         # Helper functions
-  types/         # Type definitions
-tests/
-  unit/          # Unit tests
-  integration/   # Integration tests
-```
-
-### Naming Conventions
-
-- Files: `kebab-case.ts` or `snake_case.py`
-- Components: `PascalCase`
-- Functions: `camelCase` or `snake_case`
+- Files: `kebab-case.ts`
+- Classes: `PascalCase`
+- Functions/variables: `camelCase`
 - Constants: `SCREAMING_SNAKE_CASE`
+- TL type names use dot notation: `tcp.ping`, `client.params`
+- TL field names in TS use camelCase (not snake_case from .tl)
 
 ## Testing Requirements
 
 - Write tests for new functionality
 - Ensure existing tests pass before committing
-- Use descriptive test names that explain the expected behavior
-- Mock external dependencies appropriately
+- TL serializer/deserializer must have round-trip tests for all types
 
 ## Git Workflow
 
 - Use conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`
-- Keep commits atomic and focused
-- Write clear commit messages explaining the "why"
 
 ## Common Mistakes to Avoid
 
-<!-- Add patterns that Claude should avoid - this is your "institutional memory" -->
-<!-- Example entries below - customize for your project -->
-
-- YOU MUST run tests before creating a PR
-- NEVER commit `.env` files or secrets
-- NEVER hardcode secrets, API keys, passwords, or tokens in code - use environment variables instead
-- ALWAYS check for accidental secrets before committing (look for hardcoded strings that look like keys/tokens)
-- ALWAYS use the existing logger instead of console.log
+- NEVER commit `.env` files or mnemonics
+- NEVER hardcode wallet keys or secrets
+- ALWAYS run `npm run typecheck && npm run test && npm run lint` before committing
 - DO NOT add new dependencies without discussing first
+- TL padding must align to 4 bytes for string/bytes fields
 
 ## Architecture Notes
 
-<!-- Document key architectural decisions -->
-<!-- Example: -->
-<!-- - We use repository pattern for database access -->
-<!-- - API responses follow the format: { data, error, metadata } -->
-<!-- - All dates are stored and transmitted in UTC -->
-
-## Environment Setup
-
-<!-- Document any required environment variables -->
-Required environment variables (see `.env.example`):
-- `DATABASE_URL`: Connection string for the database
-- `API_KEY`: External API authentication
+- TL schema derived from cocoon_api.tl at github.com/TelegramMessenger/cocoon
+- Frame format: [4b LE size][4b LE seqno][payload] — size is payload length only
+- Handshake: tcp.connect → tcp.connected → client.connectToProxy (as tcp.query) → client.connectedToProxy
+- Auth: short (secret hash match) or long (blockchain registration)
+- Queries: client.runQueryEx wraps an http.request TL object
+- Responses: client.queryAnswerPartEx (streaming) + client.queryAnswerEx (final)
+- Constructor IDs with # in .tl file are explicit hex values; others use CRC32
 
 ## Verification Steps
 
-IMPORTANT: Always verify your work using these methods:
-1. Run the test suite: `[test command]`
-2. Run type checking: `[typecheck command]`
-3. Run linting: `[lint command]`
-4. For UI changes, take a screenshot or use the browser to verify
+1. `npm run typecheck` — TypeScript strict mode
+2. `npm run test` — Vitest tests
+3. `npm run lint` — ESLint
+4. `npm run build` — CJS + ESM + d.ts output
