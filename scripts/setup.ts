@@ -420,6 +420,7 @@ async function main(): Promise<void> {
   console.log('\n=== Setup Complete ===');
   console.log('Put these into your .env:');
   console.log(`SECRET=${secret}`);
+  console.log(`CLIENT_SC_ADDRESS=${clientScAddressFromAuth}`);
   console.log(`PROXY_URL=${proxy.display}`);
   console.log(`COCOON_TLS_CERT_PATH=${tls.certPath}`);
   console.log(`COCOON_TLS_KEY_PATH=${tls.keyPath}`);

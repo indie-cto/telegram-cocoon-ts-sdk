@@ -1,6 +1,6 @@
 {
   "name": "cocoon-sdk",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "TypeScript SDK for Telegram Cocoon — decentralized GPU network for AI inference on TON",
   "keywords": [
     "cocoon",
@@ -43,6 +43,8 @@
     "dev": "tsup --watch",
     "cocoon:setup": "npx tsx --env-file=.env scripts/setup.ts",
     "cocoon:inference": "npx tsx --env-file=.env scripts/inference.ts",
+    "cocoon:topup": "npx tsx --env-file=.env scripts/topup.ts",
+    "cocoon:balance": "npx tsx --env-file=.env scripts/balance.ts",
     "cocoon:discover": "npx tsx scripts/discover.ts",
     "cocoon:register": "npx tsx --env-file=.env scripts/register.ts",
     "cocoon:create-wallet": "npx tsx scripts/create-wallet.ts",
