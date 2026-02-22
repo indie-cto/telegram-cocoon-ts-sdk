@@ -1,7 +1,24 @@
 {
   "name": "cocoon-sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "TypeScript SDK for Telegram Cocoon — decentralized GPU network for AI inference on TON",
+  "keywords": [
+    "cocoon",
+    "telegram",
+    "llm",
+    "openai",
+    "sdk",
+    "ton",
+    "inference"
+  ],
+  "homepage": "https://github.com/indie-cto/telegram-cocoon-ts-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/indie-cto/telegram-cocoon-ts-sdk/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/indie-cto/telegram-cocoon-ts-sdk.git"
+  },
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

@@ -187,7 +187,7 @@ async function performLongAuth(
 ): Promise<ClientAuthorizationWithProxy> {
   if (!onLongAuthRequired) {
     throw new AuthenticationError(
-      `${missingHandlerMessage}. Provide SECRET for short auth, or keep automatic long-auth registration enabled`,
+      `${missingHandlerMessage}. Provide SECRET for short auth, or explicitly enable automatic long-auth registration`,
     );
   }
 

@@ -91,7 +91,8 @@ export class Cocoon {
       network: 'mainnet',
       timeout: 120_000,
       useTls: true,
-      autoRegisterOnLongAuth: true,
+      // Safety-first default for SDK consumers: don't submit on-chain tx implicitly.
+      autoRegisterOnLongAuth: false,
       longAuthRegisterAmountTon: '1',
       ...options,
     };
