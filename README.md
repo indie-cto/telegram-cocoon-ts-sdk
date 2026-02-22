@@ -13,6 +13,23 @@ This guide is intentionally step-by-step so you can get to a working request wit
 - TON wallet mnemonic (24 words)
 - Small TON balance for one-time setup transactions
 
+### TON Balance Requirements
+
+For the default setup flow (`scripts/setup.ts`), budget:
+
+- `REGISTER_TON=1.0` TON
+- `CHANGE_SECRET_TON=0.7` TON
+- transaction fees (usually small, but non-zero)
+
+Recommended minimum:
+
+- **2.0 TON** for first successful setup
+- **3.0 TON** to avoid edge cases from fee spikes/retries
+
+Optional for heavier usage:
+
+- set `TOP_UP_TON` (for example `5` to `20` TON) to increase available balance for inference traffic.
+
 ### 1) Install dependencies
 
 ```bash
@@ -122,7 +139,7 @@ await client.disconnect();
 ## Troubleshooting
 
 - `Proxy requires long auth` or secret mismatch:
-  - run `scripts/setup.ts` again and update `.env` with fresh output.
+  - run `npm run cocoon:setup` again and update `.env` with fresh output.
 - TLS handshake closes immediately:
   - verify `COCOON_TLS_CERT_PATH` and `COCOON_TLS_KEY_PATH` exist and match.
 - TON RPC `429`:
