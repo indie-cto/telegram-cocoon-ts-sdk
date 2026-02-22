@@ -1,54 +1,75 @@
 # Cocoon TypeScript SDK
 
-OpenAI-compatible TypeScript client for [Telegram Cocoon](https://github.com/TelegramMessenger/cocoon).
+OpenAI-compatible TypeScript SDK for Telegram Cocoon.
 
-If you use it as a dependency:
+Цель этого README: пройти путь до рабочего инференса без чтения внешней документации.
 
-```bash
-npm install cocoon-sdk
-```
+## 5 минут до первого ответа
 
-## Fast Start
-
-Prerequisites:
+Что нужно:
 - Node.js `>=18`
-- TON wallet mnemonic (24 words)
-- small TON balance for one-time registration
-- `openssl` installed (used by setup script)
+- `openssl`
+- TON кошелек (24 слова) с небольшим балансом
 
-1) Install deps
+### 1. Установить зависимости
 
 ```bash
 npm install
 ```
 
-2) Create `.env`
+### 2. Создать `.env`
 
 ```bash
 cp .env.example .env
 ```
 
-Fill `MNEMONIC` in `.env`.
+Открой `.env` и заполни только:
+- `MNEMONIC=...` (твои 24 слова)
 
-3) Run one-time setup
+Остальное пока не трогай.
+
+### 3. Запустить one-time setup
 
 ```bash
 npx tsx --env-file=.env examples/setup.ts
 ```
 
-This script:
-- generates (or uses provided) TLS cert/key,
-- performs long-auth registration if required,
-- updates on-chain `secretHash`,
-- prints ready values for `.env` (`SECRET`, `PROXY_URL`, TLS paths).
+Этот шаг делает все автоматически:
+- генерирует TLS сертификат и ключ клиента,
+- регистрирует long-auth при необходимости,
+- выставляет on-chain secret hash,
+- печатает готовые значения для `.env`.
 
-4) Run inference
+Пример финального вывода:
+
+```text
+=== Setup Complete ===
+Put these into your .env:
+SECRET=...
+PROXY_URL=91.108.4.11:8888
+COCOON_TLS_CERT_PATH=/tmp/cocoon-client-xxxx.pem
+COCOON_TLS_KEY_PATH=/tmp/cocoon-client-xxxx.key.pem
+TON_V4_ENDPOINT=https://mainnet-v4.tonhubapi.com
+```
+
+### 4. Вставить значения в `.env`
+
+Скопируй строки из вывода setup в `.env`.
+
+Важно:
+- сертификаты **не нужно где-то искать**,
+- они уже сгенерированы setup-скриптом,
+- пути будут вида `/tmp/cocoon-client-...pem`.
+
+### 5. Запустить инференс
 
 ```bash
 npx tsx --env-file=.env examples/inference.ts
 ```
 
-## Minimal SDK Usage
+Если все ок, увидишь список моделей и ответ LLM.
+
+## Минимальное использование SDK
 
 ```ts
 import { Cocoon } from 'cocoon-sdk';
@@ -57,7 +78,7 @@ const client = new Cocoon({
   wallet: process.env.MNEMONIC!,
   network: 'mainnet',
   secretString: process.env.SECRET,
-  proxyUrl: process.env.PROXY_URL, // optional, discovery is used if omitted
+  proxyUrl: process.env.PROXY_URL,
   tonV4Endpoint: process.env.TON_V4_ENDPOINT,
 });
 
@@ -73,47 +94,41 @@ console.log(res.choices[0]?.message.content);
 await client.disconnect();
 ```
 
-## Streaming
+## FAQ
 
-```ts
-const stream = await client.chat.completions.create({
-  model: 'Qwen/Qwen3-32B',
-  messages: [{ role: 'user', content: 'Write one short sentence' }],
-  stream: true,
-});
+### Где брать TLS сертификаты?
 
-for await (const chunk of stream) {
-  process.stdout.write(chunk.choices[0]?.delta?.content ?? '');
-}
-```
+Нигде. В типичном сценарии `examples/setup.ts` генерирует их сам через `openssl` и печатает пути.
 
-## Config (Common)
+### Нужно ли самому генерировать `SECRET`?
 
-- `wallet` (required): mnemonic (24 words)
-- `network`: `mainnet` or `testnet` (default `mainnet`)
-- `secretString`: required for short-auth flow
-- `proxyUrl`: `host:port` (optional, skips discovery)
-- `tonEndpoint`: optional TON JSON-RPC endpoint
-- `tonV4Endpoint`: optional TON v4 endpoint (recommended for tx sending)
-- `tlsCert` + `tlsKey`: optional mTLS PEM pair
-- `attestationProvider`: dynamic TLS material provider
-- `autoRegisterOnLongAuth`: auto-send long-auth register tx when needed
+Нет. Setup генерирует и синхронизирует его с on-chain `secretHash`.
 
-## Troubleshooting
+### Можно использовать свои cert/key?
 
-- `Proxy requires long auth` / secret mismatch:
-  - run `examples/setup.ts` once and use printed `SECRET`.
-- connection closes during TLS handshake:
-  - check `COCOON_TLS_CERT_PATH` and `COCOON_TLS_KEY_PATH`.
-- public TON RPC returns `429`:
-  - set `TON_V4_ENDPOINT` (example: `https://mainnet-v4.tonhubapi.com`).
-- some models may not support `chat/completions` payload format:
-  - call `models.list()` and choose a model that supports your request shape.
+Да. Перед setup укажи:
+- `COCOON_TLS_CERT_PATH=/path/to/cert.pem`
+- `COCOON_TLS_KEY_PATH=/path/to/key.pem`
+
+Тогда setup использует их, а не создаст новые.
+
+### Что делать при `429` от TON RPC?
+
+Добавь в `.env`:
+- `TON_V4_ENDPOINT=https://mainnet-v4.tonhubapi.com`
+
+### Что делать, если соединение закрывается на TLS handshake?
+
+Проверь, что пути в:
+- `COCOON_TLS_CERT_PATH`
+- `COCOON_TLS_KEY_PATH`
+
+указывают на существующие файлы и что cert/key парные.
 
 ## Security
 
-- Never commit `.env`, mnemonics, secrets, or private keys.
-- Keep TLS key files private and short-lived.
+- Не коммить `.env`, mnemonic, secret, приватные ключи.
+- TLS ключи из `/tmp` считай временными и приватными.
 
 ## License
 
