@@ -57,8 +57,22 @@ for await (const chunk of stream) {
 
 ## One-Time Setup (Repo Helper Scripts)
 
-The npm package is a library.  
-If you want the fully automated setup flow (cert/key generation + register + secret hash), use repo scripts:
+The npm package is a **library only** (no bundled `scripts/setup.ts` files inside `node_modules`).
+
+If you want the fully automated setup flow (cert/key generation + register + secret hash), run helper scripts from the GitHub repo:
+
+```bash
+git clone https://github.com/indie-cto/telegram-cocoon-ts-sdk.git
+cd telegram-cocoon-ts-sdk
+npm install
+cp .env.example .env
+# fill MNEMONIC in .env
+npm run cocoon:setup
+```
+
+After setup, copy printed values (`SECRET`, TLS paths, `PROXY_URL`) into your app env.
+
+Quick links:
 
 - `https://github.com/indie-cto/telegram-cocoon-ts-sdk`
 - `scripts/setup.ts`
@@ -106,7 +120,7 @@ Practical guidance:
 
 - smoke setup: typically `2-3 TON` can be enough
 - stable usage: plan around `15-20 TON` total working balance
-- verify live values with repo helper: `scripts/discover.ts`
+- verify live values with repo helper (`scripts/discover.ts`)
 
 ## Security
 
