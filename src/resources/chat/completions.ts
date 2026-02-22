@@ -24,6 +24,45 @@ type SessionProvider = () => Promise<CocoonSession>;
 export class Completions {
   constructor(private readonly getSession: SessionProvider) {}
 
+  private extractHttpData(answer: Buffer): {
+    payload: Buffer;
+    statusCode?: number;
+    reason?: string;
+  } {
+    try {
+      const httpResponse = deserializeTLObject(answer) as unknown as HttpResponse;
+      if (httpResponse._type === 'http.response') {
+        return {
+          payload: httpResponse.payload,
+          statusCode: httpResponse.statusCode,
+          reason: httpResponse.reason,
+        };
+      }
+    } catch {
+      // Not a boxed http.response TL object, treat as raw payload chunk.
+    }
+    return { payload: answer };
+  }
+
+  private parseErrorPayload(payload: Buffer, fallbackMessage: string): { message: string; body: unknown } {
+    if (payload.length === 0) {
+      return { message: fallbackMessage, body: { error: fallbackMessage } };
+    }
+    const text = payload.toString('utf-8');
+    try {
+      const parsed = JSON.parse(text) as Record<string, unknown>;
+      const message =
+        typeof parsed.message === 'string'
+          ? parsed.message
+          : typeof parsed.error === 'string'
+            ? parsed.error
+            : fallbackMessage;
+      return { message, body: parsed };
+    } catch {
+      return { message: text || fallbackMessage, body: { error: text || fallbackMessage } };
+    }
+  }
+
   /**
    * Create a chat completion.
    *
@@ -79,14 +118,26 @@ export class Completions {
     httpRequest: import('../../core/tl/types.js').HttpRequest,
   ): Promise<ChatCompletion> {
     const chunks: Buffer[] = [];
+    let sawAnswer = false;
+    let statusCode: number | undefined;
+    let statusReason: string | undefined;
 
     const finalAnswer = await session.sendQuery(params.model, httpRequest, {
       maxCoefficient: params.max_coefficient,
       maxTokens: params.max_tokens ?? params.max_completion_tokens,
       timeout: params.timeout,
       onPart: (part) => {
-        if ('answer' in part && part.answer) {
-          chunks.push(part.answer as Buffer);
+        if (!('answer' in part) || !part.answer) {
+          return;
+        }
+        sawAnswer = true;
+        const extracted = this.extractHttpData(part.answer as Buffer);
+        if (extracted.statusCode !== undefined) {
+          statusCode = extracted.statusCode;
+          statusReason = extracted.reason;
+        }
+        if (extracted.payload.length > 0) {
+          chunks.push(extracted.payload);
         }
       },
     });
@@ -98,31 +149,37 @@ export class Completions {
       });
     }
 
-    // The final answer contains the HTTP response (possibly with accumulated data)
-    if ('answer' in finalAnswer && finalAnswer.answer) {
-      // Parse the TL HTTP response
-      const httpResponse = deserializeTLObject(
-        finalAnswer.answer as Buffer,
-      ) as unknown as HttpResponse;
-      if (httpResponse._type === 'http.response') {
-        // Combine all payload chunks
-        const allChunks = [...chunks];
-        if (httpResponse.payload && httpResponse.payload.length > 0) {
-          allChunks.push(httpResponse.payload);
-        }
-
-        const fullPayload = Buffer.concat(allChunks);
-        const responseBody = JSON.parse(fullPayload.toString('utf-8')) as ChatCompletion;
-        return responseBody;
+    // Safety fallback in case caller didn't receive chunk callbacks.
+    if (!sawAnswer && 'answer' in finalAnswer && finalAnswer.answer) {
+      const extracted = this.extractHttpData(finalAnswer.answer as Buffer);
+      if (extracted.statusCode !== undefined) {
+        statusCode = extracted.statusCode;
+        statusReason = extracted.reason;
+      }
+      if (extracted.payload.length > 0) {
+        chunks.push(extracted.payload);
       }
     }
 
-    // Fallback: try parsing all collected chunks
     const fullPayload = Buffer.concat(chunks);
+    if (statusCode !== undefined && statusCode >= 400) {
+      const fallback = statusReason ? `${statusCode} ${statusReason}` : `HTTP ${statusCode}`;
+      const parsed = this.parseErrorPayload(fullPayload, fallback);
+      throw new APIError(parsed.message, statusCode, parsed.body);
+    }
     if (fullPayload.length === 0) {
       throw new ProtocolError('Empty response from proxy');
     }
-    return JSON.parse(fullPayload.toString('utf-8')) as ChatCompletion;
+
+    try {
+      return JSON.parse(fullPayload.toString('utf-8')) as ChatCompletion;
+    } catch (error) {
+      throw new ProtocolError(
+        `Failed to parse completion payload as JSON: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   private async createStreaming(
@@ -133,6 +190,9 @@ export class Completions {
     const stream = new Stream<ChatCompletionChunk>();
     let sseBuffer = '';
     let headersParsed = false;
+    let statusCode: number | undefined;
+    let statusReason: string | undefined;
+    const errorChunks: Buffer[] = [];
 
     // Process streaming in background
     session
@@ -153,6 +213,8 @@ export class Completions {
                   const httpResponse = deserializeTLObject(answer) as unknown as HttpResponse;
                   if (httpResponse._type === 'http.response') {
                     headersParsed = true;
+                    statusCode = httpResponse.statusCode;
+                    statusReason = httpResponse.reason;
                     rawData = httpResponse.payload;
                   } else {
                     rawData = answer;
@@ -168,6 +230,10 @@ export class Completions {
             }
 
             if (rawData && rawData.length > 0) {
+              if (statusCode !== undefined && statusCode >= 400) {
+                errorChunks.push(rawData);
+                return;
+              }
               sseBuffer += rawData.toString('utf-8');
               this.processSSEBuffer(sseBuffer, stream);
               // Keep unprocessed remainder
@@ -182,6 +248,15 @@ export class Completions {
         },
       })
       .then(() => {
+        if (statusCode !== undefined && statusCode >= 400) {
+          const parsed = this.parseErrorPayload(
+            Buffer.concat(errorChunks),
+            statusReason ? `${statusCode} ${statusReason}` : `HTTP ${statusCode}`,
+          );
+          stream.error(new APIError(parsed.message, statusCode, parsed.body));
+          return;
+        }
+
         // Process any remaining buffer
         if (sseBuffer.trim().length > 0) {
           this.processSSEBuffer(sseBuffer + '\n', stream);

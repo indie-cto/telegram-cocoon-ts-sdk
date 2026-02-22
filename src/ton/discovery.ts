@@ -16,8 +16,8 @@ export interface DiscoveryOptions {
 
 // Known root contract addresses
 const ROOT_CONTRACTS: Record<string, string> = {
-  mainnet: 'EQDr5JVxzJYSRfEDnwLPBP1VaMUPBzGZWMFjJBOhGqhKgccU',
-  testnet: 'EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA',
+  mainnet: 'EQCns7bYSp0igFvS1wpb5wsZjCKCV19MD5AVzI4EyxsnU73k',
+  testnet: 'EQBT4hy4vMEZ9uxSCuhw_gBKh9_AwmHXLe7Wo0O4Vh-4kRjJ',
 };
 
 export class ProxyDiscovery {
@@ -73,7 +73,11 @@ export class ProxyDiscovery {
     }
 
     const root = new CocoonRoot(this.tonClient, this.rootAddress);
-    this.cachedParams = await root.getAllParams();
+    const result = await root.getAllParams();
+    if (!result) {
+      throw new Error('Root contract is not initialized');
+    }
+    this.cachedParams = result;
     this.cacheTime = now;
     return this.cachedParams;
   }

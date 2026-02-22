@@ -93,6 +93,8 @@ describe('buildHttpRequest', () => {
 
     expect(contentType?.value).toBe('application/json');
     expect(contentLength?.value).toBe(body.length.toString());
+    const host = req.headers.find((h) => h.name === 'Host');
+    expect(host?.value).toBe('api.openai.com');
   });
 
   it('should include extra headers', () => {
@@ -101,7 +103,7 @@ describe('buildHttpRequest', () => {
 
     const custom = req.headers.find((h) => h.name === 'X-Custom');
     expect(custom?.value).toBe('test');
-    expect(req.headers.length).toBe(3); // Content-Type + Content-Length + X-Custom
+    expect(req.headers.length).toBe(4); // Content-Type + Content-Length + Host + X-Custom
   });
 
   it('should handle GET with empty body', () => {
@@ -110,6 +112,15 @@ describe('buildHttpRequest', () => {
     expect(req.payload.length).toBe(0);
     const contentLength = req.headers.find((h) => h.name === 'Content-Length');
     expect(contentLength?.value).toBe('0');
+  });
+
+  it('should not duplicate Host when provided in extra headers', () => {
+    const req = buildHttpRequest('POST', '/api', Buffer.from('{}'), [
+      { _type: 'http.header', name: 'Host', value: 'localhost' },
+    ]);
+    const hosts = req.headers.filter((h) => h.name.toLowerCase() === 'host');
+    expect(hosts).toHaveLength(1);
+    expect(hosts[0]?.value).toBe('localhost');
   });
 });
 

@@ -7,6 +7,7 @@
 import {
   TL_SCHEMA,
   CONSTRUCTOR_ID_MAP,
+  POLYMORPHIC_TYPES,
   type TLFieldType,
   type TLConstructorDef,
 } from './schema.js';
@@ -116,12 +117,14 @@ export class TLDeserializer {
     throw new Error(`Invalid Bool constructor ID: 0x${id.toString(16)}`);
   }
 
-  readVector(itemType: TLFieldType): unknown[] {
-    const id = this.readUInt();
-    if (id !== VECTOR_ID) {
-      throw new Error(
-        `Expected vector constructor ID 0x${VECTOR_ID.toString(16)}, got 0x${id.toString(16)}`,
-      );
+  readVector(itemType: TLFieldType, bare = false): unknown[] {
+    if (!bare) {
+      const id = this.readUInt();
+      if (id !== VECTOR_ID) {
+        throw new Error(
+          `Expected vector constructor ID 0x${VECTOR_ID.toString(16)}, got 0x${id.toString(16)}`,
+        );
+      }
     }
     const count = this.readInt();
     const items: unknown[] = [];
@@ -206,10 +209,17 @@ export class TLDeserializer {
           throw new Error(`Unknown primitive type: ${type}`);
       }
     } else if ('vector' in type) {
-      return this.readVector(type.vector);
+      return this.readVector(type.vector, Boolean(type.bare));
     } else if ('ref' in type) {
-      // Boxed polymorphic type — read constructor ID to determine concrete type
-      return this.readObject();
+      if (type.ref in POLYMORPHIC_TYPES) {
+        // Boxed polymorphic type — constructor ID determines concrete type.
+        return this.readObject();
+      }
+      if (type.ref in TL_SCHEMA) {
+        // Concrete constructor refs are bare (no nested constructor ID).
+        return this.readObjectBare(type.ref);
+      }
+      throw new Error(`Unknown TL ref type: ${type.ref}`);
     }
 
     throw new Error(`Unhandled field type: ${JSON.stringify(type)}`);

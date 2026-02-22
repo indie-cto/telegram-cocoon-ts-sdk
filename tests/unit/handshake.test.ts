@@ -66,6 +66,15 @@ describe('waitForFrame', () => {
     await expect(promise).rejects.toThrow('Timeout waiting for frame');
     vi.useRealTimers();
   });
+
+  it('should reject immediately on connection close', async () => {
+    const mockConn = new MockConnection() as unknown as CocoonConnection;
+    const promise = waitForFrame(mockConn, 10_000);
+
+    (mockConn as unknown as MockConnection).emit('close');
+
+    await expect(promise).rejects.toThrow('Connection closed while waiting for handshake frame');
+  });
 });
 
 describe('waitForQueryAnswer', () => {
@@ -167,6 +176,15 @@ describe('waitForQueryAnswer', () => {
 
     await expect(promise).rejects.toThrow('Timeout waiting for query answer');
     vi.useRealTimers();
+  });
+
+  it('should reject immediately on connection close', async () => {
+    const mockConn = new MockConnection() as unknown as CocoonConnection;
+
+    const promise = waitForQueryAnswer(mockConn, 42n, 10_000);
+    (mockConn as unknown as MockConnection).emit('close');
+
+    await expect(promise).rejects.toThrow('Connection closed while waiting for query answer');
   });
 });
 
@@ -452,9 +470,61 @@ describe('performHandshake flow', () => {
       'EQOwner',
       secretString,
       0,
+      async () => {},
     );
 
     expect(longAuthCalled).toBe(true);
     expect(result.tokensCommittedToDb).toBe(500n);
+  });
+
+  it('should fail fast with actionable error when long auth is required but no handler is configured', async () => {
+    const { performHandshake } = await import('../../src/core/protocol/handshake');
+    const mockConn = new MockConnection();
+
+    mockConn.send = function (data: Buffer) {
+      this.sentData.push(Buffer.from(data));
+      const obj = deserializeTLObject(data);
+
+      if (obj['_type'] === 'tcp.connect') {
+        const response = { _type: 'tcp.connected', id: obj['id'] };
+        process.nextTick(() =>
+          mockConn.emit('frame', serializeTLObject(response as unknown as Record<string, unknown>)),
+        );
+      } else if (obj['_type'] === 'tcp.query') {
+        const innerData = obj['data'] as Buffer;
+        const innerObj = deserializeTLObject(innerData);
+
+        if (innerObj['_type'] === 'client.connectToProxy') {
+          const connected = {
+            _type: 'client.connectedToProxy',
+            params: {
+              _type: 'proxy.params',
+              flags: 0,
+              proxyPublicKey: Buffer.alloc(32),
+              proxyOwnerAddress: 'EQProxy',
+              proxyScAddress: 'EQProxySC',
+            },
+            clientScAddress: 'EQClient',
+            auth: {
+              _type: 'client.proxyConnectionAuthLong',
+              nonce: 777n,
+            },
+            signedPayment: { _type: 'proxy.signedPaymentEmpty' },
+          };
+          const responseData = serializeTLObject(connected as unknown as Record<string, unknown>);
+          const tcpAnswer = { _type: 'tcp.queryAnswer', id: obj['id'], data: responseData };
+          process.nextTick(() =>
+            mockConn.emit(
+              'frame',
+              serializeTLObject(tcpAnswer as unknown as Record<string, unknown>),
+            ),
+          );
+        }
+      }
+    };
+
+    await expect(
+      performHandshake(mockConn as unknown as CocoonConnection, 'EQOwner', 'secret', 0),
+    ).rejects.toThrow('Proxy requires long auth');
   });
 });

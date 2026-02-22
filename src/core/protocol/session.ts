@@ -10,7 +10,11 @@
 import crypto from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { CocoonConnection, type ConnectionOptions } from './connection.js';
-import { performHandshake, type HandshakeResult } from './handshake.js';
+import {
+  performHandshake,
+  type HandshakeResult,
+  type LongAuthHandler,
+} from './handshake.js';
 import { serializeTLObject } from '../tl/serializer.js';
 import { deserializeTLObject } from '../tl/deserializer.js';
 import { ConnectionError, ProtocolError, TimeoutError } from '../error.js';
@@ -25,6 +29,7 @@ export interface SessionOptions extends ConnectionOptions {
   ownerAddress: string;
   secretString: string;
   configVersion?: number;
+  onLongAuthRequired?: LongAuthHandler;
 }
 
 interface PendingQuery {
@@ -68,6 +73,7 @@ export class CocoonSession extends EventEmitter {
       this.options.ownerAddress,
       this.options.secretString,
       this.options.configVersion ?? 0,
+      this.options.onLongAuthRequired,
     );
 
     this._connected = true;
@@ -158,7 +164,7 @@ export class CocoonSession extends EventEmitter {
       throw new ConnectionError('Not connected');
     }
 
-    const queryId = BigInt('0x' + crypto.randomBytes(8).toString('hex'));
+    const queryId = crypto.randomBytes(8).readBigInt64LE();
     const data = serializeTLObject(tlObject, true);
 
     const tcpQuery = {
@@ -263,30 +269,50 @@ export class CocoonSession extends EventEmitter {
   private handleInnerPacket(obj: Record<string, unknown>): void {
     const type = obj['_type'] as string;
 
+    // Normalize legacy query answer variants to Ex-shape used by the SDK.
+    let normalized: Record<string, unknown> = obj;
+    if (type === 'client.queryAnswer') {
+      normalized = {
+        ...obj,
+        _type: 'client.queryAnswerEx',
+      };
+    } else if (type === 'client.queryAnswerPart') {
+      normalized = {
+        ...obj,
+        _type: 'client.queryAnswerPartEx',
+      };
+    } else if (type === 'client.queryAnswerError' || type === 'client.queryAnswerPartError') {
+      normalized = {
+        ...obj,
+        _type: 'client.queryAnswerErrorEx',
+      };
+    }
+
+    const normalizedType = normalized['_type'] as string;
     if (
-      type === 'client.queryAnswerEx' ||
-      type === 'client.queryAnswerErrorEx' ||
-      type === 'client.queryAnswerPartEx'
+      normalizedType === 'client.queryAnswerEx' ||
+      normalizedType === 'client.queryAnswerErrorEx' ||
+      normalizedType === 'client.queryAnswerPartEx'
     ) {
-      const requestId = (obj['requestId'] as Buffer).toString('hex');
+      const requestId = (normalized['requestId'] as Buffer).toString('hex');
       const pending = this.pendingQueries.get(requestId);
       if (!pending) {
         return;
       }
 
-      const answer = obj as unknown as ClientQueryAnswerExType;
+      const answer = normalized as unknown as ClientQueryAnswerExType;
 
-      if (type === 'client.queryAnswerPartEx') {
-        // Streaming part
-        pending.onPart?.(answer);
-      } else if (type === 'client.queryAnswerEx') {
-        // Final answer (may also contain data for streaming)
-        pending.onPart?.(answer);
+      if (normalizedType === 'client.queryAnswerErrorEx') {
+        // Error is always terminal.
         clearTimeout(pending.timer);
         this.pendingQueries.delete(requestId);
         pending.resolve(answer);
-      } else if (type === 'client.queryAnswerErrorEx') {
-        // Error
+        return;
+      }
+
+      // Both queryAnswerEx and queryAnswerPartEx can carry intermediate or final chunks.
+      pending.onPart?.(answer);
+      if (this.isTerminalQueryAnswer(answer)) {
         clearTimeout(pending.timer);
         this.pendingQueries.delete(requestId);
         pending.resolve(answer);
@@ -294,11 +320,60 @@ export class CocoonSession extends EventEmitter {
     }
   }
 
+  private isTerminalQueryAnswer(answer: ClientQueryAnswerExType): boolean {
+    if (answer._type === 'client.queryAnswerErrorEx') {
+      return true;
+    }
+
+    // Legacy protocol may provide explicit completion bit.
+    const legacyIsCompleted = (answer as unknown as { isCompleted?: boolean }).isCompleted;
+    if (typeof legacyIsCompleted === 'boolean') {
+      return legacyIsCompleted;
+    }
+
+    // Ex protocol signals final chunk via final_info (flags.0).
+    if ('finalInfo' in answer && answer.finalInfo) {
+      return true;
+    }
+    if ('flags' in answer && typeof answer.flags === 'number' && (answer.flags & 1) !== 0) {
+      return true;
+    }
+
+    // If this is an HTTP envelope with chunked transfer, more chunks will follow.
+    if ('answer' in answer && answer.answer) {
+      try {
+        const envelope = deserializeTLObject(answer.answer) as {
+          _type?: string;
+          headers?: Array<{ name: string; value: string }>;
+        };
+        if (envelope._type === 'http.response') {
+          const transferEncoding = envelope.headers?.find(
+            (h) => h.name.toLowerCase() === 'transfer-encoding',
+          )?.value;
+          if (transferEncoding && transferEncoding.toLowerCase().includes('chunked')) {
+            return false;
+          }
+          return true;
+        }
+      } catch {
+        // Raw payload (not an envelope). Fall through to type-based heuristic below.
+      }
+    }
+
+    // PartEx without explicit completion markers is not terminal.
+    if (answer._type === 'client.queryAnswerPartEx') {
+      return false;
+    }
+
+    // Ex without completion markers/envelope is treated as terminal fallback.
+    return true;
+  }
+
   private startKeepalive(): void {
     // Send ping every 10 seconds
     this.keepaliveTimer = setInterval(() => {
       if (this.conn?.isConnected) {
-        const pingId = BigInt('0x' + crypto.randomBytes(8).toString('hex'));
+        const pingId = crypto.randomBytes(8).readBigInt64LE();
         const ping = { _type: 'tcp.ping', id: pingId };
         try {
           this.conn.send(serializeTLObject(ping as unknown as Record<string, unknown>));
@@ -332,11 +407,20 @@ export function buildHttpRequest(
   body: Buffer,
   extraHeaders: HttpHeader[] = [],
 ): HttpRequest {
-  const headers: HttpHeader[] = [
-    { _type: 'http.header', name: 'Content-Type', value: 'application/json' },
-    { _type: 'http.header', name: 'Content-Length', value: body.length.toString() },
-    ...extraHeaders,
-  ];
+  const hasHeader = (name: string): boolean =>
+    extraHeaders.some((h) => h.name.toLowerCase() === name.toLowerCase());
+
+  const headers: HttpHeader[] = [...extraHeaders];
+  if (!hasHeader('Content-Type')) {
+    headers.unshift({ _type: 'http.header', name: 'Content-Type', value: 'application/json' });
+  }
+  if (!hasHeader('Content-Length')) {
+    headers.push({ _type: 'http.header', name: 'Content-Length', value: body.length.toString() });
+  }
+  // Most HTTP/1.1 upstreams require Host header.
+  if (!hasHeader('Host')) {
+    headers.push({ _type: 'http.header', name: 'Host', value: 'api.openai.com' });
+  }
 
   return {
     _type: 'http.request',

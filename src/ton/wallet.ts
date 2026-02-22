@@ -6,7 +6,7 @@
  */
 
 import { mnemonicToPrivateKey } from '@ton/crypto';
-import { WalletContractV4, TonClient } from '@ton/ton';
+import { WalletContractV4, TonClient, TonClient4 } from '@ton/ton';
 import { Address, type Sender } from '@ton/core';
 import crypto from 'node:crypto';
 
@@ -22,16 +22,25 @@ export class MnemonicWallet {
   private wallet: WalletContractV4 | null = null;
   private _address: Address | null = null;
   private tonClient: TonClient | null = null;
+  private tonClient4: TonClient4 | null = null;
 
-  constructor(mnemonic: string, network: 'mainnet' | 'testnet' = 'mainnet') {
+  constructor(
+    mnemonic: string,
+    network: 'mainnet' | 'testnet' = 'mainnet',
+    options?: { tonEndpoint?: string; tonV4Endpoint?: string },
+  ) {
     this.mnemonic = mnemonic.trim().split(/\s+/);
     if (this.mnemonic.length !== 24) {
       throw new Error(`Expected 24 mnemonic words, got ${this.mnemonic.length}`);
     }
     this.network = network;
+    this.tonEndpoint = options?.tonEndpoint;
+    this.tonV4Endpoint = options?.tonV4Endpoint;
   }
 
   private readonly network: 'mainnet' | 'testnet';
+  private readonly tonEndpoint?: string;
+  private readonly tonV4Endpoint?: string;
 
   async init(): Promise<void> {
     if (this.keyPair) return;
@@ -78,13 +87,29 @@ export class MnemonicWallet {
   getTonClient(): TonClient {
     if (!this.tonClient) {
       const endpoint =
-        this.network === 'mainnet'
+        this.tonEndpoint ??
+        (this.network === 'mainnet'
           ? 'https://toncenter.com/api/v2/jsonRPC'
-          : 'https://testnet.toncenter.com/api/v2/jsonRPC';
+          : 'https://testnet.toncenter.com/api/v2/jsonRPC');
 
       this.tonClient = new TonClient({ endpoint });
     }
     return this.tonClient;
+  }
+
+  /**
+   * Get or create a TonClient4 for sending transactions via v4 HTTP API.
+   */
+  getTonClient4(): TonClient4 {
+    if (!this.tonClient4) {
+      const endpoint =
+        this.tonV4Endpoint ??
+        (this.network === 'mainnet'
+          ? 'https://mainnet-v4.tonhubapi.com'
+          : 'https://testnet-v4.tonhubapi.com');
+      this.tonClient4 = new TonClient4({ endpoint });
+    }
+    return this.tonClient4;
   }
 
   /**
@@ -95,7 +120,7 @@ export class MnemonicWallet {
       throw new Error('Wallet not initialized');
     }
 
-    const client = this.getTonClient();
+    const client = this.getTonClient4();
     const contract = client.open(this.wallet);
 
     return contract.sender(this.keyPair.secretKey);
