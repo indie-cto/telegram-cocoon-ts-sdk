@@ -70,19 +70,58 @@ cp .env.example .env
 npm run cocoon:setup
 ```
 
-After setup, copy printed values (`SECRET`, TLS paths, `PROXY_URL`) into your app env.
+After setup, copy printed values into your app `.env`:
+- `SECRET`
+- `CLIENT_SC_ADDRESS`
+- `PROXY_URL`
+- `COCOON_TLS_CERT_PATH`
+- `COCOON_TLS_KEY_PATH`
 
 Quick links:
 
 - `https://github.com/indie-cto/telegram-cocoon-ts-sdk`
 - `scripts/setup.ts`
 - `scripts/inference.ts`
+- `scripts/topup.ts`
+- `scripts/balance.ts`
 
-Important for users integrating from another project:
-
-- The intended and supported path is to run `scripts/setup.ts` once and copy `SECRET` + TLS paths.
+Important:
+- The intended path is: run `scripts/setup.ts` once, then reuse generated env values.
 - Manual certificate generation is intentionally not documented here.
-- If you skip setup, the full flow usually won't work (missing secret/state initialization/top-up context).
+- If you skip setup, full flow usually will not work.
+
+## If Stake Runs Out
+
+Refill the same `client_sc` contract with a top-up transaction. You do not need a new `SECRET` or new TLS certs.
+
+```bash
+# in .env set at least:
+# MNEMONIC=...
+# CLIENT_SC_ADDRESS=...
+# TOP_UP_TON=10
+npm run cocoon:topup
+```
+
+Notes:
+- `CLIENT_SC_ADDRESS` is printed by `npm run cocoon:setup`.
+- If `CLIENT_SC_ADDRESS` is missing, `cocoon:topup` can try to resolve it via handshake (`SECRET` + TLS + proxy envs), but explicit `CLIENT_SC_ADDRESS` is more reliable.
+
+## How To Monitor Balance
+
+Use the helper script:
+
+```bash
+# in .env set:
+# CLIENT_SC_ADDRESS=...
+# (optional) MNEMONIC=... to also print wallet balance
+npm run cocoon:balance
+```
+
+It prints:
+- current `client_sc` balance
+- live `minClientStake` from root config
+- headroom/deficit relative to `minClientStake`
+- wallet balance (if mnemonic provided)
 
 ## TON Balance Guidance
 
