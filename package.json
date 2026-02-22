@@ -24,6 +24,11 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
+    "cocoon:setup": "npx tsx --env-file=.env scripts/setup.ts",
+    "cocoon:inference": "npx tsx --env-file=.env scripts/inference.ts",
+    "cocoon:discover": "npx tsx scripts/discover.ts",
+    "cocoon:register": "npx tsx --env-file=.env scripts/register.ts",
+    "cocoon:create-wallet": "npx tsx scripts/create-wallet.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",

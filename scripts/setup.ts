@@ -7,7 +7,7 @@
  * - verifies short auth with generated SECRET
  *
  * Usage:
- *   npx tsx --env-file=.env examples/setup.ts
+ *   npx tsx --env-file=.env scripts/setup.ts
  *
  * Env:
  *   MNEMONIC=...                     (required)

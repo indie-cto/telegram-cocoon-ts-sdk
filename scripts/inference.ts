@@ -2,7 +2,7 @@
  * Run inference on Cocoon network.
  *
  * Usage:
- *   npx tsx --env-file=.env examples/inference.ts
+ *   npx tsx --env-file=.env scripts/inference.ts
  *
  * Optional env vars:
  *   NETWORK=mainnet|testnet (default: mainnet)
@@ -12,7 +12,6 @@
  *   STREAM=true|false (default: true)
  *   COCOON_TLS_CERT_PATH=/path/client-cert.pem
  *   COCOON_TLS_KEY_PATH=/path/client-key.pem
- *   AUTO_REGISTER_LONG_AUTH=false (advanced: disable automatic long-auth registration)
  *   TON_ENDPOINT=https://your-ton-rpc/jsonRPC
  *   TON_V4_ENDPOINT=https://mainnet-v4.tonhubapi.com
  */
@@ -32,7 +31,6 @@ async function main() {
   const stream = process.env.STREAM !== 'false';
   const tlsCertPath = process.env.COCOON_TLS_CERT_PATH;
   const tlsKeyPath = process.env.COCOON_TLS_KEY_PATH;
-  const autoRegisterOnLongAuth = process.env.AUTO_REGISTER_LONG_AUTH !== 'false';
   const secret = process.env.SECRET;
 
   const tlsCert = tlsCertPath ? readFileSync(tlsCertPath, 'utf-8') : undefined;
@@ -51,7 +49,7 @@ async function main() {
     tonV4Endpoint: process.env.TON_V4_ENDPOINT,
     tlsCert,
     tlsKey,
-    autoRegisterOnLongAuth,
+    autoRegisterOnLongAuth: true,
   });
 
   try {

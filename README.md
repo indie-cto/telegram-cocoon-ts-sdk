@@ -34,7 +34,7 @@ MNEMONIC=your 24 words here
 ### 3) Run one-time setup
 
 ```bash
-npx tsx --env-file=.env examples/setup.ts
+npm run cocoon:setup
 ```
 
 What setup does for you:
@@ -61,12 +61,12 @@ TON_V4_ENDPOINT=https://mainnet-v4.tonhubapi.com
 Copy those lines exactly into `.env`.
 
 Important: you do not need to find or create certificates manually.  
-`examples/setup.ts` creates them and gives you the file paths.
+`scripts/setup.ts` creates them and gives you the file paths.
 
 ### 5) Run inference
 
 ```bash
-npx tsx --env-file=.env examples/inference.ts
+npm run cocoon:inference
 ```
 
 You should see:
@@ -107,16 +107,22 @@ await client.disconnect();
 ## Useful Commands
 
 - Setup once:
-  - `npx tsx --env-file=.env examples/setup.ts`
+  - `npm run cocoon:setup`
 - Inference test:
-  - `npx tsx --env-file=.env examples/inference.ts`
+  - `npm run cocoon:inference`
 - Discover proxies/models:
-  - `npx tsx --env-file=.env examples/discover.ts`
+  - `npm run cocoon:discover`
+- Register only (advanced):
+  - `npm run cocoon:register`
+- Create wallet helper:
+  - `npm run cocoon:create-wallet`
+- Pure library example:
+  - `npx tsx --env-file=.env examples/basic.ts`
 
 ## Troubleshooting
 
 - `Proxy requires long auth` or secret mismatch:
-  - run `examples/setup.ts` again and update `.env` with fresh output.
+  - run `scripts/setup.ts` again and update `.env` with fresh output.
 - TLS handshake closes immediately:
   - verify `COCOON_TLS_CERT_PATH` and `COCOON_TLS_KEY_PATH` exist and match.
 - TON RPC `429`:

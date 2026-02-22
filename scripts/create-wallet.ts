@@ -1,5 +1,8 @@
 /**
  * Generate a new TON wallet for Cocoon.
+ *
+ * Usage:
+ *   npx tsx scripts/create-wallet.ts
  */
 import { mnemonicNew, mnemonicToPrivateKey } from '@ton/crypto';
 import { WalletContractV4 } from '@ton/ton';
