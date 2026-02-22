@@ -57,8 +57,22 @@ for await (const chunk of stream) {
 
 ## One-Time Setup (Repo Helper Scripts)
 
-The npm package is a library.  
-If you want the fully automated setup flow (cert/key generation + register + secret hash), use repo scripts:
+The npm package is a **library only** (no bundled `scripts/setup.ts` files inside `node_modules`).
+
+If you want the fully automated setup flow (cert/key generation + register + secret hash), run helper scripts from the GitHub repo:
+
+```bash
+git clone https://github.com/indie-cto/telegram-cocoon-ts-sdk.git
+cd telegram-cocoon-ts-sdk
+npm install
+cp .env.example .env
+# fill MNEMONIC in .env
+npm run cocoon:setup
+```
+
+After setup, copy printed values (`SECRET`, TLS paths, `PROXY_URL`) into your app env.
+
+Quick links:
 
 - `https://github.com/indie-cto/telegram-cocoon-ts-sdk`
 - `scripts/setup.ts`
@@ -66,29 +80,9 @@ If you want the fully automated setup flow (cert/key generation + register + sec
 
 Important for users integrating from another project:
 
-- The intended path is to run `scripts/setup.ts` once and copy `SECRET` + TLS paths.
-- Do **not** rely on ad-hoc certificate generation commands from agents.
-- A generic command like `openssl req -x509 -newkey ec ...` is not the tested/default SDK path.
-
-If you cannot run `scripts/setup.ts`, use this tested certificate generation format:
-
-```bash
-openssl genpkey -algorithm ed25519 -out /tmp/cocoon-client.key.pem
-openssl req -x509 \
-  -key /tmp/cocoon-client.key.pem \
-  -out /tmp/cocoon-client-cert.pem \
-  -days 1 \
-  -subj "/C=AE/ST=DUBAI/O=TDLib Development/OU=Security/CN=localhost"
-```
-
-Then set:
-
-```env
-COCOON_TLS_CERT_PATH=/tmp/cocoon-client-cert.pem
-COCOON_TLS_KEY_PATH=/tmp/cocoon-client.key.pem
-```
-
-Note: this only covers TLS material. You still need a valid `SECRET` (recommended via setup flow).
+- The intended and supported path is to run `scripts/setup.ts` once and copy `SECRET` + TLS paths.
+- Manual certificate generation is intentionally not documented here.
+- If you skip setup, the full flow usually won't work (missing secret/state initialization/top-up context).
 
 ## TON Balance Guidance
 
@@ -106,7 +100,7 @@ Practical guidance:
 
 - smoke setup: typically `2-3 TON` can be enough
 - stable usage: plan around `15-20 TON` total working balance
-- verify live values with repo helper: `scripts/discover.ts`
+- verify live values with repo helper (`scripts/discover.ts`)
 
 ## Security
 
