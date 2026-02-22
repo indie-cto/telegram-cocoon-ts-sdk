@@ -130,6 +130,11 @@ await client.disconnect();
 - Не коммить `.env`, mnemonic, secret, приватные ключи.
 - TLS ключи из `/tmp` считай временными и приватными.
 
+## Примеры в репо
+
+- боевые сценарии: `examples/setup.ts`, `examples/inference.ts`, `examples/discover.ts`
+- отладка протокола: `examples/debug/*`
+
 ## License
 
 MIT

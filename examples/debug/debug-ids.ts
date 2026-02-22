@@ -1,7 +1,7 @@
 /**
  * Debug: verify TL constructor IDs and analyze proxy response bytes.
  */
-import { TL_SCHEMA, CONSTRUCTOR_ID_MAP, crc32 } from '../src/core/tl/schema.js';
+import { TL_SCHEMA, CONSTRUCTOR_ID_MAP, crc32 } from '../../src/core/tl/schema.js';
 
 // Print all constructor IDs
 console.log('=== All Constructor IDs ===');

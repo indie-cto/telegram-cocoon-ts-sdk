@@ -9,7 +9,7 @@ import {
   solvePow,
   buildPowResponse,
   POW_CHALLENGE_SIZE,
-} from '../src/core/protocol/pow.js';
+} from '../../src/core/protocol/pow.js';
 import { execSync } from 'node:child_process';
 import { writeFileSync, readFileSync } from 'node:fs';
 

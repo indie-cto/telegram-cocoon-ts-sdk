@@ -10,10 +10,10 @@ import {
   solvePow,
   buildPowResponse,
   POW_CHALLENGE_SIZE,
-} from '../src/core/protocol/pow.js';
-import { TL_SCHEMA, crc32 } from '../src/core/tl/schema.js';
-import { serializeTLObject } from '../src/core/tl/serializer.js';
-import { deserializeTLObject } from '../src/core/tl/deserializer.js';
+} from '../../src/core/protocol/pow.js';
+import { TL_SCHEMA, crc32 } from '../../src/core/tl/schema.js';
+import { serializeTLObject } from '../../src/core/tl/serializer.js';
+import { deserializeTLObject } from '../../src/core/tl/deserializer.js';
 
 const host = '91.108.4.11';
 const port = 8888;
