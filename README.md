@@ -15,20 +15,25 @@ This guide is intentionally step-by-step so you can get to a working request wit
 
 ### TON Balance Requirements
 
-For the default setup flow (`scripts/setup.ts`), budget:
+Two different numbers matter:
 
+1) **Setup transaction spend** (what setup sends from wallet by default):
 - `REGISTER_TON=1.0` TON
 - `CHANGE_SECRET_TON=0.7` TON
-- transaction fees (usually small, but non-zero)
+- plus network fees
 
-Recommended minimum:
+2) **Protocol stake parameter** (`minClientStake`) from root config.
+As of **February 22, 2026** on mainnet:
+- `minClientStake = 15 TON`
 
-- **2.0 TON** for first successful setup
-- **3.0 TON** to avoid edge cases from fee spikes/retries
+So:
+- **2-3 TON** is usually enough to complete setup transactions.
+- For stable inference usage, plan for **~15-20 TON** total working balance (stake + buffer).
+- Current live values can change; check with `npm run cocoon:discover`.
 
 Optional for heavier usage:
 
-- set `TOP_UP_TON` (for example `5` to `20` TON) to increase available balance for inference traffic.
+- set `TOP_UP_TON` (for example `15` or `20`) to increase available client balance for inference traffic.
 
 ### 1) Install dependencies
 
