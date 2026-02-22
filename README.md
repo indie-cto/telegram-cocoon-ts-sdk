@@ -1,141 +1,119 @@
 # Cocoon TypeScript SDK
 
-TypeScript SDK for [Telegram Cocoon](https://github.com/TelegramMessenger/cocoon) — decentralized GPU network for AI inference on TON blockchain.
+OpenAI-compatible TypeScript client for [Telegram Cocoon](https://github.com/TelegramMessenger/cocoon).
 
-Provides an **OpenAI-compatible API** over Cocoon's binary TL protocol.
-
-## Install
+If you use it as a dependency:
 
 ```bash
 npm install cocoon-sdk
 ```
 
-## Quick Start
+## Fast Start
 
-```typescript
-import { Cocoon } from 'cocoon-sdk';
+Prerequisites:
+- Node.js `>=18`
+- TON wallet mnemonic (24 words)
+- small TON balance for one-time registration
+- `openssl` installed (used by setup script)
 
-const client = new Cocoon({
-  wallet: 'your 24 word mnemonic phrase here ...',
-  network: 'mainnet',
-});
+1) Install deps
 
-// Chat completion (non-streaming)
-const response = await client.chat.completions.create({
-  model: 'deepseek-r1',
-  messages: [{ role: 'user', content: 'Hello!' }],
-});
-
-console.log(response.choices[0].message.content);
+```bash
+npm install
 ```
 
-## Streaming
+2) Create `.env`
 
-```typescript
-const stream = await client.chat.completions.create({
-  model: 'llama-3.1-70b',
-  messages: [{ role: 'user', content: 'Write a poem about the moon' }],
-  stream: true,
-});
-
-for await (const chunk of stream) {
-  process.stdout.write(chunk.choices[0]?.delta?.content || '');
-}
+```bash
+cp .env.example .env
 ```
 
-## List Models
+Fill `MNEMONIC` in `.env`.
 
-```typescript
-const models = await client.models.list();
-for (const model of models.data) {
-  console.log(`${model.id} — ${model.active_workers} workers`);
-}
-```
-
-## Configuration
-
-```typescript
-const client = new Cocoon({
-  wallet: 'your 24 word mnemonic ...',   // Required
-  network: 'mainnet',                     // 'mainnet' | 'testnet' (default: 'mainnet')
-  proxyUrl: 'host:port',                  // Direct proxy (bypasses discovery)
-  timeout: 120_000,                       // Request timeout in ms (default: 120s)
-  tonEndpoint: 'https://your-ton-rpc',    // Optional TON RPC endpoint for on-chain ops
-  tonV4Endpoint: 'https://mainnet-v4.tonhubapi.com', // Optional TON v4 endpoint for wallet tx sending
-  secretString: process.env.SECRET,       // Recommended: secret from registration (short auth)
-  tlsCert: process.env.COCOON_TLS_CERT_PEM, // Optional: RA-TLS/mTLS client cert
-  tlsKey: process.env.COCOON_TLS_KEY_PEM,   // Optional: RA-TLS/mTLS client key
-  autoRegisterOnLongAuth: false,          // If true, sends on-chain register tx when long auth is required
-  longAuthRegisterAmountTon: '1',         // TON amount for auto long-auth register tx
-});
-```
-
-## RA-TLS / mTLS
-
-Mainnet Cocoon proxies may require RA-TLS client credentials.
-
-You can provide credentials in two ways:
-
-```typescript
-import { Cocoon, FileAttestationProvider } from 'cocoon-sdk';
-
-const client = new Cocoon({
-  wallet: 'your 24 word mnemonic ...',
-  proxyUrl: '91.108.4.11:8888',
-  attestationProvider: new FileAttestationProvider(
-    '/run/cocoon/client_cert.pem',
-    '/run/cocoon/client_key.pem',
-  ),
-});
-```
-
-Or pass static PEM values with `tlsCert` + `tlsKey`.
-
-If the connection closes during handshake, verify that:
-- The client certificate and key are both present.
-- The certificate is RA-TLS-compatible with proxy policy (not just generic self-signed TLS).
-
-## Auth Modes
-
-Cocoon has two auth modes:
-- `short auth`: requires `secretString` that matches your on-chain secret hash.
-- `long auth`: requires an on-chain register transaction with nonce from proxy.
-
-If `secretString` is missing or mismatched, proxy can require long auth.
-By default SDK does **not** send on-chain tx automatically. You can:
-- set `autoRegisterOnLongAuth: true`, or
-- run a one-time registration flow and then always use `secretString`.
-
-## One-Time Setup
-
-Use onboarding script to bootstrap wallet + secret:
+3) Run one-time setup
 
 ```bash
 npx tsx --env-file=.env examples/setup.ts
 ```
 
-It will:
-- prepare mTLS cert/key (or use your provided paths),
-- run long-auth register tx if needed,
-- set `secretHash` on-chain,
-- print ready-to-copy `.env` values (`SECRET`, TLS paths, `PROXY_URL`).
+This script:
+- generates (or uses provided) TLS cert/key,
+- performs long-auth registration if required,
+- updates on-chain `secretHash`,
+- prints ready values for `.env` (`SECRET`, `PROXY_URL`, TLS paths).
 
-If you hit `429` on public toncenter during registration, set `TON_V4_ENDPOINT`
-(for example `https://mainnet-v4.tonhubapi.com`).
+4) Run inference
 
-## Prerequisites
+```bash
+npx tsx --env-file=.env examples/inference.ts
+```
 
-- **Node.js** >= 18
-- A **TON wallet** with sufficient balance for inference requests
-- The wallet must be registered with a Cocoon proxy (see [Cocoon docs](https://github.com/TelegramMessenger/cocoon/blob/main/docs/smart-contracts.md))
+## Minimal SDK Usage
 
-## How It Works
+```ts
+import { Cocoon } from 'cocoon-sdk';
 
-1. SDK connects to a Cocoon proxy via TCP/TLS
-2. Performs handshake and authentication using the TL binary protocol
-3. Sends inference requests as TL-serialized HTTP requests
-4. Receives streaming responses via `queryAnswerPartEx` + `queryAnswerEx`
-5. Parses responses into OpenAI-compatible types
+const client = new Cocoon({
+  wallet: process.env.MNEMONIC!,
+  network: 'mainnet',
+  secretString: process.env.SECRET,
+  proxyUrl: process.env.PROXY_URL, // optional, discovery is used if omitted
+  tonV4Endpoint: process.env.TON_V4_ENDPOINT,
+});
+
+const models = await client.models.list();
+const model = models.data[0]!.id;
+
+const res = await client.chat.completions.create({
+  model,
+  messages: [{ role: 'user', content: 'Say OK' }],
+});
+
+console.log(res.choices[0]?.message.content);
+await client.disconnect();
+```
+
+## Streaming
+
+```ts
+const stream = await client.chat.completions.create({
+  model: 'Qwen/Qwen3-32B',
+  messages: [{ role: 'user', content: 'Write one short sentence' }],
+  stream: true,
+});
+
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0]?.delta?.content ?? '');
+}
+```
+
+## Config (Common)
+
+- `wallet` (required): mnemonic (24 words)
+- `network`: `mainnet` or `testnet` (default `mainnet`)
+- `secretString`: required for short-auth flow
+- `proxyUrl`: `host:port` (optional, skips discovery)
+- `tonEndpoint`: optional TON JSON-RPC endpoint
+- `tonV4Endpoint`: optional TON v4 endpoint (recommended for tx sending)
+- `tlsCert` + `tlsKey`: optional mTLS PEM pair
+- `attestationProvider`: dynamic TLS material provider
+- `autoRegisterOnLongAuth`: auto-send long-auth register tx when needed
+
+## Troubleshooting
+
+- `Proxy requires long auth` / secret mismatch:
+  - run `examples/setup.ts` once and use printed `SECRET`.
+- connection closes during TLS handshake:
+  - check `COCOON_TLS_CERT_PATH` and `COCOON_TLS_KEY_PATH`.
+- public TON RPC returns `429`:
+  - set `TON_V4_ENDPOINT` (example: `https://mainnet-v4.tonhubapi.com`).
+- some models may not support `chat/completions` payload format:
+  - call `models.list()` and choose a model that supports your request shape.
+
+## Security
+
+- Never commit `.env`, mnemonics, secrets, or private keys.
+- Keep TLS key files private and short-lived.
 
 ## License
 
