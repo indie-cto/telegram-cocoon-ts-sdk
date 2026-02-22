@@ -35,6 +35,12 @@ Optional for heavier usage:
 
 - set `TOP_UP_TON` (for example `15` or `20`) to increase available client balance for inference traffic.
 
+Is staking mandatory?
+
+- For a first smoke test, **no manual top-up is required**.
+- For normal/stable usage, **top-up is strongly recommended**.
+- Practical target: set `TOP_UP_TON=15` (or higher) before running setup.
+
 ### 1) Install dependencies
 
 ```bash
@@ -65,6 +71,12 @@ What setup does for you:
 - performs long-auth registration if needed,
 - sets on-chain secret hash,
 - prints ready-to-paste `.env` values.
+
+If you want to include staking/top-up in the same setup run:
+
+```bash
+TOP_UP_TON=15 npm run cocoon:setup
+```
 
 Example final output:
 
