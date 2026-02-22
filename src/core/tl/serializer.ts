@@ -12,7 +12,12 @@
  * - Bool: boolTrue(0x997275b5) or boolFalse(0xbc799737)
  */
 
-import { TL_SCHEMA, type TLFieldType, type TLConstructorDef } from './schema.js';
+import {
+  TL_SCHEMA,
+  POLYMORPHIC_TYPES,
+  type TLFieldType,
+  type TLConstructorDef,
+} from './schema.js';
 
 const VECTOR_ID = 0x1cb5c415;
 const BOOL_TRUE_ID = 0x997275b5;
@@ -89,8 +94,10 @@ export class TLSerializer {
     this.writeUInt(value ? BOOL_TRUE_ID : BOOL_FALSE_ID);
   }
 
-  writeVector(items: unknown[], itemType: TLFieldType): void {
-    this.writeUInt(VECTOR_ID);
+  writeVector(items: unknown[], itemType: TLFieldType, bare = false): void {
+    if (!bare) {
+      this.writeUInt(VECTOR_ID);
+    }
     this.writeInt(items.length);
     for (const item of items) {
       this.writeField(item, itemType);
@@ -193,10 +200,26 @@ export class TLSerializer {
           throw new Error(`Unknown primitive type: ${type}`);
       }
     } else if ('vector' in type) {
-      this.writeVector(value as unknown[], type.vector);
+      this.writeVector(value as unknown[], type.vector, Boolean(type.bare));
     } else if ('ref' in type) {
-      // Reference to another TL type — must be a boxed object
-      this.writeObject(value as Record<string, unknown>, true);
+      // Concrete constructor refs are bare in TL (no nested constructor ID).
+      // Polymorphic refs are boxed and must include constructor ID.
+      const isPolymorphicRef = type.ref in POLYMORPHIC_TYPES;
+      if (isPolymorphicRef) {
+        this.writeObject(value as Record<string, unknown>, true);
+        return;
+      }
+
+      if (!(type.ref in TL_SCHEMA)) {
+        throw new Error(`Unknown TL ref type: ${type.ref}`);
+      }
+
+      const obj = value as Record<string, unknown>;
+      const nestedType = obj['_type'] as string | undefined;
+      if (nestedType && nestedType !== type.ref) {
+        throw new Error(`Expected nested type ${type.ref}, got ${nestedType}`);
+      }
+      this.writeObject(nestedType ? obj : { ...obj, _type: type.ref }, false);
     }
   }
 

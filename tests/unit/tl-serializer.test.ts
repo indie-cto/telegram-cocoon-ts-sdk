@@ -297,6 +297,36 @@ describe('TL Object round-trip', () => {
     expect(result['_type']).toBe('proxy.signedPaymentEmpty');
   });
 
+  it('should keep polymorphic nested refs boxed', () => {
+    const obj = {
+      _type: 'client.connectedToProxy',
+      params: {
+        _type: 'proxy.params',
+        flags: 0,
+        proxyPublicKey: Buffer.alloc(32, 1),
+        proxyOwnerAddress: 'EQProxyOwner',
+        proxyScAddress: 'EQProxySc',
+      },
+      clientScAddress: 'EQClientSc',
+      auth: {
+        _type: 'client.proxyConnectionAuthLong',
+        nonce: 7n,
+      },
+      signedPayment: {
+        _type: 'proxy.signedPaymentEmpty',
+      },
+    };
+
+    const buf = serializeTLObject(obj as unknown as Record<string, unknown>);
+    const result = deserializeTLObject(buf);
+    expect(result['_type']).toBe('client.connectedToProxy');
+    const auth = result['auth'] as Record<string, unknown>;
+    expect(auth['_type']).toBe('client.proxyConnectionAuthLong');
+    expect(auth['nonce']).toBe(7n);
+    const signed = result['signedPayment'] as Record<string, unknown>;
+    expect(signed['_type']).toBe('proxy.signedPaymentEmpty');
+  });
+
   it('should round-trip client.connectToProxy with nested objects', () => {
     const obj = {
       _type: 'client.connectToProxy',
@@ -317,6 +347,31 @@ describe('TL Object round-trip', () => {
     const params = result['params'] as Record<string, unknown>;
     expect(params['_type']).toBe('client.params');
     expect(params['clientOwnerAddress']).toBe('EQTest');
+  });
+
+  it('should encode concrete nested refs as bare objects (no nested constructor id)', () => {
+    const obj = {
+      _type: 'client.connectToProxy',
+      params: {
+        _type: 'client.params',
+        flags: 2,
+        clientOwnerAddress: 'EQTest',
+        minProtoVersion: 0,
+        maxProtoVersion: 1,
+      },
+      minConfigVersion: 5,
+    };
+
+    const buf = serializeTLObject(obj as unknown as Record<string, unknown>);
+    const d = new TLDeserializer(buf);
+    expect(d.readUInt()).toBe(TL_SCHEMA['client.connectToProxy']!.id);
+    // If params were boxed, this would be 0x40fdca64 (constructor id).
+    expect(d.readInt()).toBe(2);
+    expect(d.readString()).toBe('EQTest');
+    expect(d.readInt()).toBe(0);
+    expect(d.readInt()).toBe(1);
+    expect(d.readInt()).toBe(5);
+    expect(d.remaining).toBe(0);
   });
 
   it('should round-trip client.getWorkerTypesV2 (empty function)', () => {

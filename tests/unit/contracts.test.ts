@@ -10,6 +10,8 @@ vi.mock('@ton/ton', () => {
   const cellMock = { toBoc: () => Buffer.alloc(64) };
   const builderMock = {
     storeUint: vi.fn().mockReturnThis(),
+    storeCoins: vi.fn().mockReturnThis(),
+    storeAddress: vi.fn().mockReturnThis(),
     storeBuffer: vi.fn().mockReturnThis(),
     endCell: vi.fn().mockReturnValue(cellMock),
   };
@@ -32,13 +34,15 @@ import { Address, beginCell, toNano } from '@ton/ton';
 import type { Sender } from '@ton/core';
 
 describe('CocoonClientContract', () => {
+  const ownerAddress = Address.parse('EQOwner');
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   describe('createRegisterBody', () => {
     it('should store correct opcode', () => {
-      CocoonClientContract.createRegisterBody(1234n);
+      CocoonClientContract.createRegisterBody(1234n, ownerAddress);
 
       const builder = (beginCell as unknown as ReturnType<typeof vi.fn>)();
       // The first storeUint call should be the opcode
@@ -46,7 +50,7 @@ describe('CocoonClientContract', () => {
     });
 
     it('should store queryId and nonce', () => {
-      CocoonClientContract.createRegisterBody(5678n, 99n);
+      CocoonClientContract.createRegisterBody(5678n, ownerAddress, 99n);
 
       const builder = (beginCell as unknown as ReturnType<typeof vi.fn>)();
       expect(builder.storeUint).toHaveBeenCalledWith(99n, 64); // queryId
@@ -54,16 +58,24 @@ describe('CocoonClientContract', () => {
     });
 
     it('should default queryId to 0', () => {
-      CocoonClientContract.createRegisterBody(1234n);
+      CocoonClientContract.createRegisterBody(1234n, ownerAddress);
 
       const builder = (beginCell as unknown as ReturnType<typeof vi.fn>)();
       expect(builder.storeUint).toHaveBeenCalledWith(0n, 64); // default queryId
+    });
+
+    it('should normalize signed values to uint64', () => {
+      CocoonClientContract.createRegisterBody(-1n, ownerAddress, -2n);
+
+      const builder = (beginCell as unknown as ReturnType<typeof vi.fn>)();
+      expect(builder.storeUint).toHaveBeenCalledWith(BigInt.asUintN(64, -2n), 64);
+      expect(builder.storeUint).toHaveBeenCalledWith(BigInt.asUintN(64, -1n), 64);
     });
   });
 
   describe('createChangeSecretHashBody', () => {
     it('should store correct opcode', () => {
-      CocoonClientContract.createChangeSecretHashBody(Buffer.alloc(32));
+      CocoonClientContract.createChangeSecretHashBody(Buffer.alloc(32), ownerAddress);
 
       const builder = (beginCell as unknown as ReturnType<typeof vi.fn>)();
       expect(builder.storeUint).toHaveBeenCalledWith(0xa9357034, 32);
@@ -71,7 +83,7 @@ describe('CocoonClientContract', () => {
 
     it('should store 32-byte hash', () => {
       const hash = Buffer.alloc(32, 0xab);
-      CocoonClientContract.createChangeSecretHashBody(hash);
+      CocoonClientContract.createChangeSecretHashBody(hash, ownerAddress);
 
       const builder = (beginCell as unknown as ReturnType<typeof vi.fn>)();
       expect(builder.storeBuffer).toHaveBeenCalledWith(hash, 32);
@@ -80,17 +92,18 @@ describe('CocoonClientContract', () => {
 
   describe('createTopUpBody', () => {
     it('should store correct opcode', () => {
-      CocoonClientContract.createTopUpBody();
+      CocoonClientContract.createTopUpBody(1000n, ownerAddress);
 
       const builder = (beginCell as unknown as ReturnType<typeof vi.fn>)();
       expect(builder.storeUint).toHaveBeenCalledWith(0xf172e6c2, 32);
     });
 
     it('should store queryId', () => {
-      CocoonClientContract.createTopUpBody(42n);
+      CocoonClientContract.createTopUpBody(42n, ownerAddress, 7n);
 
       const builder = (beginCell as unknown as ReturnType<typeof vi.fn>)();
-      expect(builder.storeUint).toHaveBeenCalledWith(42n, 64);
+      expect(builder.storeUint).toHaveBeenCalledWith(7n, 64);
+      expect(builder.storeCoins).toHaveBeenCalledWith(42n);
     });
   });
 
@@ -103,7 +116,7 @@ describe('CocoonClientContract', () => {
       const address = Address.parse('EQTest');
       const contract = new CocoonClientContract(address);
 
-      await contract.register(mockSender, 1234n);
+      await contract.register(mockSender, ownerAddress, 1234n);
 
       expect(mockSender.send).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -120,7 +133,7 @@ describe('CocoonClientContract', () => {
       const address = Address.parse('EQTest');
       const contract = new CocoonClientContract(address);
 
-      await contract.register(mockSender, 1234n);
+      await contract.register(mockSender, ownerAddress, 1234n);
 
       expect(mockSender.send).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -139,12 +152,12 @@ describe('CocoonClientContract', () => {
       const address = Address.parse('EQTest');
       const contract = new CocoonClientContract(address);
 
-      await contract.topUp(mockSender, 5000000000n);
+      await contract.topUp(mockSender, ownerAddress, 5000000000n);
 
       expect(mockSender.send).toHaveBeenCalledWith(
         expect.objectContaining({
           to: address,
-          value: 5000000000n,
+          value: 5000000000n + toNano('0.7'),
         }),
       );
     });
@@ -160,7 +173,7 @@ describe('CocoonClientContract', () => {
       const contract = new CocoonClientContract(address);
       const hash = Buffer.alloc(32, 0xff);
 
-      await contract.changeSecretHash(mockSender, hash);
+      await contract.changeSecretHash(mockSender, ownerAddress, hash);
 
       expect(mockSender.send).toHaveBeenCalledWith(
         expect.objectContaining({

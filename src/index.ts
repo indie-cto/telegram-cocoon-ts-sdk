@@ -8,6 +8,15 @@
 // Main client
 export { Cocoon } from './client.js';
 export type { CocoonOptions } from './client.js';
+export type {
+  AttestationProvider,
+  AttestationContext,
+  ClientTlsCredentials,
+} from './core/protocol/attestation.js';
+export {
+  StaticAttestationProvider,
+  FileAttestationProvider,
+} from './core/protocol/attestation.js';
 
 // Chat types
 export type {

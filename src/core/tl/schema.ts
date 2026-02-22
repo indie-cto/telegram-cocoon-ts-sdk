@@ -17,7 +17,7 @@ export type TLFieldType =
   | 'bytes'
   | 'Bool'
   | 'true' // bare true (flag field present = true)
-  | { vector: TLFieldType }
+  | { vector: TLFieldType; bare?: boolean }
   | { ref: string }; // reference to another TL type by _type name
 
 export interface TLFieldDef {
@@ -144,7 +144,7 @@ export const TL_SCHEMA: Record<string, TLConstructorDef> = {
       { name: 'workerOwnerAddress', type: 'string' },
       { name: 'model', type: 'string' },
       { name: 'coefficient', type: 'int' },
-      { name: 'isTest', type: 'true', flag: { field: 'flags', bit: 0 } },
+      { name: 'isTest', type: 'Bool', flag: { field: 'flags', bit: 0 } },
       { name: 'proxyCnt', type: 'int', flag: { field: 'flags', bit: 0 } },
       { name: 'maxActiveRequests', type: 'int', flag: { field: 'flags', bit: 0 } },
       { name: 'minProtoVersion', type: 'int', flag: { field: 'flags', bit: 1 } },
@@ -160,7 +160,7 @@ export const TL_SCHEMA: Record<string, TLConstructorDef> = {
       { name: 'proxyPublicKey', type: 'int256' },
       { name: 'proxyOwnerAddress', type: 'string' },
       { name: 'proxyScAddress', type: 'string' },
-      { name: 'isTest', type: 'true', flag: { field: 'flags', bit: 0 } },
+      { name: 'isTest', type: 'Bool', flag: { field: 'flags', bit: 0 } },
       { name: 'protoVersion', type: 'int', flag: { field: 'flags', bit: 1 } },
     ],
   },
@@ -171,7 +171,7 @@ export const TL_SCHEMA: Record<string, TLConstructorDef> = {
     fields: [
       { name: 'flags', type: 'int' },
       { name: 'clientOwnerAddress', type: 'string' },
-      { name: 'isTest', type: 'true', flag: { field: 'flags', bit: 0 } },
+      { name: 'isTest', type: 'Bool', flag: { field: 'flags', bit: 0 } },
       { name: 'minProtoVersion', type: 'int', flag: { field: 'flags', bit: 1 } },
       { name: 'maxProtoVersion', type: 'int', flag: { field: 'flags', bit: 1 } },
     ],
@@ -254,6 +254,52 @@ export const TL_SCHEMA: Record<string, TLConstructorDef> = {
   },
 
   // --- Query Answer Ex variants ---
+  // Legacy variants (still sent by some proxy paths):
+  'client.queryAnswer': {
+    id: tlId(
+      'client.queryAnswer answer:bytes is_completed:Bool request_id:int256 request_tokens_used:tokensUsed = client.QueryAnswer',
+    ),
+    fields: [
+      { name: 'answer', type: 'bytes' },
+      { name: 'isCompleted', type: 'Bool' },
+      { name: 'requestId', type: 'int256' },
+      { name: 'requestTokensUsed', type: { ref: 'tokensUsed' } },
+    ],
+  },
+  'client.queryAnswerError': {
+    id: tlId(
+      'client.queryAnswerError error_code:int error:string request_id:int256 request_tokens_used:tokensUsed = client.QueryAnswer',
+    ),
+    fields: [
+      { name: 'errorCode', type: 'int' },
+      { name: 'error', type: 'string' },
+      { name: 'requestId', type: 'int256' },
+      { name: 'requestTokensUsed', type: { ref: 'tokensUsed' } },
+    ],
+  },
+  'client.queryAnswerPart': {
+    id: tlId(
+      'client.queryAnswerPart answer:bytes is_completed:Bool request_id:int256 request_tokens_used:tokensUsed = client.QueryAnswerPart',
+    ),
+    fields: [
+      { name: 'answer', type: 'bytes' },
+      { name: 'isCompleted', type: 'Bool' },
+      { name: 'requestId', type: 'int256' },
+      { name: 'requestTokensUsed', type: { ref: 'tokensUsed' } },
+    ],
+  },
+  'client.queryAnswerPartError': {
+    id: tlId(
+      'client.queryAnswerPartError error_code:int error:string request_id:int256 request_tokens_used:tokensUsed = client.QueryAnswerPart',
+    ),
+    fields: [
+      { name: 'errorCode', type: 'int' },
+      { name: 'error', type: 'string' },
+      { name: 'requestId', type: 'int256' },
+      { name: 'requestTokensUsed', type: { ref: 'tokensUsed' } },
+    ],
+  },
+
   'client.queryAnswerEx': {
     id: tlId(
       'client.queryAnswerEx request_id:int256 answer:bytes flags:# final_info:flags.0?client.queryFinalInfo = client.QueryAnswerEx',
@@ -313,17 +359,20 @@ export const TL_SCHEMA: Record<string, TLConstructorDef> = {
     ],
   },
   'client.workerTypeV2': {
-    id: tlId(
-      'client.workerTypeV2 name:string workers:(vector client.workerInstanceV2) = client.WorkerTypeV2',
-    ),
+    // NOTE: Telegram TL canonical CRC for vector fields uses "vector T" syntax.
+    // Equivalent canonical form:
+    // "client.workerTypeV2 name:string workers:vector client.workerInstanceV2 = client.WorkerTypeV2"
+    id: 0xb27d8197,
     fields: [
       { name: 'name', type: 'string' },
-      { name: 'workers', type: { vector: { ref: 'client.workerInstanceV2' } } },
+      { name: 'workers', type: { vector: { ref: 'client.workerInstanceV2' }, bare: true } },
     ],
   },
   'client.workerTypesV2': {
-    id: tlId('client.workerTypesV2 types:(vector client.workerTypeV2) = client.WorkerTypesV2'),
-    fields: [{ name: 'types', type: { vector: { ref: 'client.workerTypeV2' } } }],
+    // Canonical form:
+    // "client.workerTypesV2 types:vector client.workerTypeV2 = client.WorkerTypesV2"
+    id: 0x0cf0dc67,
+    fields: [{ name: 'types', type: { vector: { ref: 'client.workerTypeV2' }, bare: true } }],
   },
 
   // --- Payment ---
@@ -335,6 +384,20 @@ export const TL_SCHEMA: Record<string, TLConstructorDef> = {
       { name: 'signedPayment', type: { ref: 'proxy.SignedPayment' } },
       { name: 'dbTokens', type: 'long' },
       { name: 'maxTokens', type: 'long' },
+    ],
+  },
+
+  // Payment request from proxy to client (may be sent during query flow).
+  'proxy.clientRequestPayment': {
+    id: tlId(
+      'proxy.clientRequestPayment request_id:int256 signed_payment:proxy.SignedPayment db_tokens:long max_tokens:long request_tokens:long = proxy.WorkerRequestPayment',
+    ),
+    fields: [
+      { name: 'requestId', type: 'int256' },
+      { name: 'signedPayment', type: { ref: 'proxy.SignedPayment' } },
+      { name: 'dbTokens', type: 'long' },
+      { name: 'maxTokens', type: 'long' },
+      { name: 'requestTokens', type: 'long' },
     ],
   },
 
@@ -356,26 +419,26 @@ export const TL_SCHEMA: Record<string, TLConstructorDef> = {
     ],
   },
   'http.response': {
-    id: tlId(
-      'http.response http_version:string status_code:int reason:string headers:(vector http.header) payload:bytes = http.Response',
-    ),
+    // Canonical vector form for CRC:
+    // "http.response http_version:string status_code:int reason:string headers:vector http.header payload:bytes = http.Response"
+    id: 0x1cd0c42b,
     fields: [
       { name: 'httpVersion', type: 'string' },
       { name: 'statusCode', type: 'int' },
       { name: 'reason', type: 'string' },
-      { name: 'headers', type: { vector: { ref: 'http.header' } } },
+      { name: 'headers', type: { vector: { ref: 'http.header' }, bare: true } },
       { name: 'payload', type: 'bytes' },
     ],
   },
   'http.request': {
-    id: tlId(
-      'http.request method:string url:string http_version:string headers:(vector http.header) payload:bytes = http.Response',
-    ),
+    // Canonical vector form for CRC:
+    // "http.request method:string url:string http_version:string headers:vector http.header payload:bytes = http.Response"
+    id: 0x47492de5,
     fields: [
       { name: 'method', type: 'string' },
       { name: 'url', type: 'string' },
       { name: 'httpVersion', type: 'string' },
-      { name: 'headers', type: { vector: { ref: 'http.header' } } },
+      { name: 'headers', type: { vector: { ref: 'http.header' }, bare: true } },
       { name: 'payload', type: 'bytes' },
     ],
     isFunction: true,

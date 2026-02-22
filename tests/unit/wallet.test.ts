@@ -29,9 +29,16 @@ vi.mock('@ton/ton', () => {
     }),
   }));
 
+  const MockTonClient4 = vi.fn().mockImplementation((_opts: { endpoint: string }) => ({
+    open: vi.fn().mockReturnValue({
+      sender: vi.fn().mockReturnValue({}),
+    }),
+  }));
+
   return {
     WalletContractV4: MockWalletContractV4,
     TonClient: MockTonClient,
+    TonClient4: MockTonClient4,
   };
 });
 

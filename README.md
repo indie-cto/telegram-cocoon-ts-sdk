@@ -60,8 +60,68 @@ const client = new Cocoon({
   network: 'mainnet',                     // 'mainnet' | 'testnet' (default: 'mainnet')
   proxyUrl: 'host:port',                  // Direct proxy (bypasses discovery)
   timeout: 120_000,                       // Request timeout in ms (default: 120s)
+  tonEndpoint: 'https://your-ton-rpc',    // Optional TON RPC endpoint for on-chain ops
+  tonV4Endpoint: 'https://mainnet-v4.tonhubapi.com', // Optional TON v4 endpoint for wallet tx sending
+  secretString: process.env.SECRET,       // Recommended: secret from registration (short auth)
+  tlsCert: process.env.COCOON_TLS_CERT_PEM, // Optional: RA-TLS/mTLS client cert
+  tlsKey: process.env.COCOON_TLS_KEY_PEM,   // Optional: RA-TLS/mTLS client key
+  autoRegisterOnLongAuth: false,          // If true, sends on-chain register tx when long auth is required
+  longAuthRegisterAmountTon: '1',         // TON amount for auto long-auth register tx
 });
 ```
+
+## RA-TLS / mTLS
+
+Mainnet Cocoon proxies may require RA-TLS client credentials.
+
+You can provide credentials in two ways:
+
+```typescript
+import { Cocoon, FileAttestationProvider } from 'cocoon-sdk';
+
+const client = new Cocoon({
+  wallet: 'your 24 word mnemonic ...',
+  proxyUrl: '91.108.4.11:8888',
+  attestationProvider: new FileAttestationProvider(
+    '/run/cocoon/client_cert.pem',
+    '/run/cocoon/client_key.pem',
+  ),
+});
+```
+
+Or pass static PEM values with `tlsCert` + `tlsKey`.
+
+If the connection closes during handshake, verify that:
+- The client certificate and key are both present.
+- The certificate is RA-TLS-compatible with proxy policy (not just generic self-signed TLS).
+
+## Auth Modes
+
+Cocoon has two auth modes:
+- `short auth`: requires `secretString` that matches your on-chain secret hash.
+- `long auth`: requires an on-chain register transaction with nonce from proxy.
+
+If `secretString` is missing or mismatched, proxy can require long auth.
+By default SDK does **not** send on-chain tx automatically. You can:
+- set `autoRegisterOnLongAuth: true`, or
+- run a one-time registration flow and then always use `secretString`.
+
+## One-Time Setup
+
+Use onboarding script to bootstrap wallet + secret:
+
+```bash
+npx tsx --env-file=.env examples/setup.ts
+```
+
+It will:
+- prepare mTLS cert/key (or use your provided paths),
+- run long-auth register tx if needed,
+- set `secretHash` on-chain,
+- print ready-to-copy `.env` values (`SECRET`, TLS paths, `PROXY_URL`).
+
+If you hit `429` on public toncenter during registration, set `TON_V4_ENDPOINT`
+(for example `https://mainnet-v4.tonhubapi.com`).
 
 ## Prerequisites
 

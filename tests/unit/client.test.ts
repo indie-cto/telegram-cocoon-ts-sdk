@@ -3,6 +3,10 @@ import { Cocoon } from '../../src/client';
 import { Completions } from '../../src/resources/chat/completions';
 import { Models } from '../../src/resources/models/models';
 
+const { mockSessionCtorOptions } = vi.hoisted(() => ({
+  mockSessionCtorOptions: vi.fn(),
+}));
+
 // Mock all heavy dependencies
 vi.mock('../../src/ton/wallet', () => {
   class MockWallet {
@@ -53,7 +57,12 @@ vi.mock('../../src/core/protocol/session', async (importOriginal) => {
   class MockSession extends EventEmitter {
     _connected = true;
 
-    get connected() {
+    constructor(options?: unknown) {
+      super();
+      mockSessionCtorOptions(options);
+    }
+
+    get connected(): boolean {
       return this._connected;
     }
 
@@ -84,6 +93,7 @@ const VALID_MNEMONIC = Array(24).fill('test').join(' ');
 
 describe('Cocoon', () => {
   afterEach(() => {
+    mockSessionCtorOptions.mockReset();
     vi.restoreAllMocks();
   });
 
@@ -117,6 +127,28 @@ describe('Cocoon', () => {
       expect(() => new Cocoon({ wallet: 'just three words' })).toThrow(
         'Expected 24 mnemonic words',
       );
+    });
+
+    it('should throw when only tlsCert is provided', () => {
+      expect(() => new Cocoon({ wallet: VALID_MNEMONIC, tlsCert: 'cert-only' })).toThrow(
+        'Both tlsCert and tlsKey must be provided together for mTLS',
+      );
+    });
+
+    it('should throw when attestationProvider is combined with tlsCert/tlsKey', () => {
+      const provider = {
+        getClientTlsCredentials: vi.fn(),
+      };
+
+      expect(
+        () =>
+          new Cocoon({
+            wallet: VALID_MNEMONIC,
+            tlsCert: 'cert',
+            tlsKey: 'key',
+            attestationProvider: provider,
+          }),
+      ).toThrow('Use either attestationProvider or tlsCert/tlsKey, not both');
     });
 
     it('should skip discovery when proxyUrl is provided', () => {
@@ -224,6 +256,39 @@ describe('Cocoon', () => {
       // If it connects without throwing, the parsing worked
       const session = (client as unknown as { session: unknown }).session;
       expect(session).not.toBeNull();
+    });
+  });
+
+  describe('attestation provider', () => {
+    it('should resolve credentials via provider and pass them to session', async () => {
+      const provider = {
+        getClientTlsCredentials: vi.fn().mockResolvedValue({
+          cert: 'provided-cert',
+          key: 'provided-key',
+        }),
+      };
+
+      const client = new Cocoon({
+        wallet: VALID_MNEMONIC,
+        network: 'mainnet',
+        proxyUrl: 'my-proxy.example.com:9090',
+        attestationProvider: provider,
+      });
+
+      await client.connect();
+
+      expect(provider.getClientTlsCredentials).toHaveBeenCalledWith({
+        host: 'my-proxy.example.com',
+        port: 9090,
+        network: 'mainnet',
+      });
+
+      expect(mockSessionCtorOptions).toHaveBeenCalled();
+      const firstCall = mockSessionCtorOptions.mock.calls[0]?.[0] as
+        | { tlsCert?: string; tlsKey?: string }
+        | undefined;
+      expect(firstCall?.tlsCert).toBe('provided-cert');
+      expect(firstCall?.tlsKey).toBe('provided-key');
     });
   });
 });
