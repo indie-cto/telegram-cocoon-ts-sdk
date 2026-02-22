@@ -12,7 +12,7 @@
  *   STREAM=true|false (default: true)
  *   COCOON_TLS_CERT_PATH=/path/client-cert.pem
  *   COCOON_TLS_KEY_PATH=/path/client-key.pem
- *   AUTO_REGISTER_LONG_AUTH=true (send on-chain register tx when long auth is required)
+ *   AUTO_REGISTER_LONG_AUTH=false (advanced: disable automatic long-auth registration)
  *   TON_ENDPOINT=https://your-ton-rpc/jsonRPC
  *   TON_V4_ENDPOINT=https://mainnet-v4.tonhubapi.com
  */
@@ -32,15 +32,8 @@ async function main() {
   const stream = process.env.STREAM !== 'false';
   const tlsCertPath = process.env.COCOON_TLS_CERT_PATH;
   const tlsKeyPath = process.env.COCOON_TLS_KEY_PATH;
-  const autoRegisterOnLongAuth = process.env.AUTO_REGISTER_LONG_AUTH === 'true';
+  const autoRegisterOnLongAuth = process.env.AUTO_REGISTER_LONG_AUTH !== 'false';
   const secret = process.env.SECRET;
-
-  if (!secret && !autoRegisterOnLongAuth) {
-    console.error(
-      'Error: SECRET env var required, or set AUTO_REGISTER_LONG_AUTH=true for long-auth registration flow',
-    );
-    process.exit(1);
-  }
 
   const tlsCert = tlsCertPath ? readFileSync(tlsCertPath, 'utf-8') : undefined;
   const tlsKey = tlsKeyPath ? readFileSync(tlsKeyPath, 'utf-8') : undefined;
