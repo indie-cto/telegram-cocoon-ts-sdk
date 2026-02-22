@@ -9,7 +9,7 @@ import {
   solvePow,
   buildPowResponse,
   POW_CHALLENGE_SIZE,
-} from '../src/core/protocol/pow.js';
+} from '../../src/core/protocol/pow.js';
 
 const host = '91.108.4.11';
 const port = 8888;

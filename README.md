@@ -1,141 +1,91 @@
 # Cocoon TypeScript SDK
 
-TypeScript SDK for [Telegram Cocoon](https://github.com/TelegramMessenger/cocoon) — decentralized GPU network for AI inference on TON blockchain.
+OpenAI-style TypeScript SDK for Telegram Cocoon.
 
-Provides an **OpenAI-compatible API** over Cocoon's binary TL protocol.
+- npm: `cocoon-sdk`
+- repo: `https://github.com/indie-cto/telegram-cocoon-ts-sdk`
 
 ## Install
 
 ```bash
-npm install cocoon-sdk
+npm i cocoon-sdk
 ```
 
-## Quick Start
+## Minimal Usage
 
-```typescript
+```ts
 import { Cocoon } from 'cocoon-sdk';
 
 const client = new Cocoon({
-  wallet: 'your 24 word mnemonic phrase here ...',
-  network: 'mainnet',
+  wallet: process.env.MNEMONIC!,        // 24 words
+  secretString: process.env.SECRET!,    // from your setup flow
+  proxyUrl: process.env.PROXY_URL,      // optional (discovery if omitted)
+  tonV4Endpoint: process.env.TON_V4_ENDPOINT,
 });
 
-// Chat completion (non-streaming)
-const response = await client.chat.completions.create({
-  model: 'deepseek-r1',
-  messages: [{ role: 'user', content: 'Hello!' }],
+const models = await client.models.list();
+const model = models.data[0]!.id;
+
+const result = await client.chat.completions.create({
+  model,
+  messages: [{ role: 'user', content: 'Say OK' }],
 });
 
-console.log(response.choices[0].message.content);
+console.log(result.choices[0]?.message.content);
+await client.disconnect();
 ```
 
 ## Streaming
 
-```typescript
+```ts
 const stream = await client.chat.completions.create({
-  model: 'llama-3.1-70b',
-  messages: [{ role: 'user', content: 'Write a poem about the moon' }],
+  model: 'Qwen/Qwen3-32B',
+  messages: [{ role: 'user', content: 'Write one short sentence' }],
   stream: true,
 });
 
 for await (const chunk of stream) {
-  process.stdout.write(chunk.choices[0]?.delta?.content || '');
+  process.stdout.write(chunk.choices[0]?.delta?.content ?? '');
 }
 ```
 
-## List Models
+## Important Defaults
 
-```typescript
-const models = await client.models.list();
-for (const model of models.data) {
-  console.log(`${model.id} — ${model.active_workers} workers`);
-}
-```
+- `autoRegisterOnLongAuth` default is `false` (safety-first).
+- SDK does **not** submit on-chain registration tx unless you explicitly enable it.
+- Recommended production path: run setup once, then use `SECRET` for short auth.
 
-## Configuration
+## One-Time Setup (Repo Helper Scripts)
 
-```typescript
-const client = new Cocoon({
-  wallet: 'your 24 word mnemonic ...',   // Required
-  network: 'mainnet',                     // 'mainnet' | 'testnet' (default: 'mainnet')
-  proxyUrl: 'host:port',                  // Direct proxy (bypasses discovery)
-  timeout: 120_000,                       // Request timeout in ms (default: 120s)
-  tonEndpoint: 'https://your-ton-rpc',    // Optional TON RPC endpoint for on-chain ops
-  tonV4Endpoint: 'https://mainnet-v4.tonhubapi.com', // Optional TON v4 endpoint for wallet tx sending
-  secretString: process.env.SECRET,       // Recommended: secret from registration (short auth)
-  tlsCert: process.env.COCOON_TLS_CERT_PEM, // Optional: RA-TLS/mTLS client cert
-  tlsKey: process.env.COCOON_TLS_KEY_PEM,   // Optional: RA-TLS/mTLS client key
-  autoRegisterOnLongAuth: false,          // If true, sends on-chain register tx when long auth is required
-  longAuthRegisterAmountTon: '1',         // TON amount for auto long-auth register tx
-});
-```
+The npm package is a library.  
+If you want the fully automated setup flow (cert/key generation + register + secret hash), use repo scripts:
 
-## RA-TLS / mTLS
+- `https://github.com/indie-cto/telegram-cocoon-ts-sdk`
+- `scripts/setup.ts`
+- `scripts/inference.ts`
 
-Mainnet Cocoon proxies may require RA-TLS client credentials.
+## TON Balance Guidance
 
-You can provide credentials in two ways:
+Two values matter:
 
-```typescript
-import { Cocoon, FileAttestationProvider } from 'cocoon-sdk';
+1. Setup spend defaults:
+- `REGISTER_TON=1.0`
+- `CHANGE_SECRET_TON=0.7`
+- plus fees
 
-const client = new Cocoon({
-  wallet: 'your 24 word mnemonic ...',
-  proxyUrl: '91.108.4.11:8888',
-  attestationProvider: new FileAttestationProvider(
-    '/run/cocoon/client_cert.pem',
-    '/run/cocoon/client_key.pem',
-  ),
-});
-```
+2. Network stake parameter (`minClientStake`) from root config:
+- on mainnet, this can be much higher (for example 15 TON on Feb 22, 2026)
 
-Or pass static PEM values with `tlsCert` + `tlsKey`.
+Practical guidance:
 
-If the connection closes during handshake, verify that:
-- The client certificate and key are both present.
-- The certificate is RA-TLS-compatible with proxy policy (not just generic self-signed TLS).
+- smoke setup: typically `2-3 TON` can be enough
+- stable usage: plan around `15-20 TON` total working balance
+- verify live values with repo helper: `scripts/discover.ts`
 
-## Auth Modes
+## Security
 
-Cocoon has two auth modes:
-- `short auth`: requires `secretString` that matches your on-chain secret hash.
-- `long auth`: requires an on-chain register transaction with nonce from proxy.
-
-If `secretString` is missing or mismatched, proxy can require long auth.
-By default SDK does **not** send on-chain tx automatically. You can:
-- set `autoRegisterOnLongAuth: true`, or
-- run a one-time registration flow and then always use `secretString`.
-
-## One-Time Setup
-
-Use onboarding script to bootstrap wallet + secret:
-
-```bash
-npx tsx --env-file=.env examples/setup.ts
-```
-
-It will:
-- prepare mTLS cert/key (or use your provided paths),
-- run long-auth register tx if needed,
-- set `secretHash` on-chain,
-- print ready-to-copy `.env` values (`SECRET`, TLS paths, `PROXY_URL`).
-
-If you hit `429` on public toncenter during registration, set `TON_V4_ENDPOINT`
-(for example `https://mainnet-v4.tonhubapi.com`).
-
-## Prerequisites
-
-- **Node.js** >= 18
-- A **TON wallet** with sufficient balance for inference requests
-- The wallet must be registered with a Cocoon proxy (see [Cocoon docs](https://github.com/TelegramMessenger/cocoon/blob/main/docs/smart-contracts.md))
-
-## How It Works
-
-1. SDK connects to a Cocoon proxy via TCP/TLS
-2. Performs handshake and authentication using the TL binary protocol
-3. Sends inference requests as TL-serialized HTTP requests
-4. Receives streaming responses via `queryAnswerPartEx` + `queryAnswerEx`
-5. Parses responses into OpenAI-compatible types
+- Never commit mnemonic, secrets, or private keys.
+- Treat TLS key files as sensitive.
 
 ## License
 

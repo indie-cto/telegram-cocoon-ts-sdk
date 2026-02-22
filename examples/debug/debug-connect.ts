@@ -3,8 +3,8 @@
  */
 import * as net from 'node:net';
 import crypto from 'node:crypto';
-import { serializeTLObject } from '../src/core/tl/serializer.js';
-import { deserializeTLObject } from '../src/core/tl/deserializer.js';
+import { serializeTLObject } from '../../src/core/tl/serializer.js';
+import { deserializeTLObject } from '../../src/core/tl/deserializer.js';
 
 const host = '91.108.4.11';
 const port = 8888;

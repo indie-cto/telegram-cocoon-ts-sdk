@@ -2,7 +2,7 @@
  * Discover Cocoon network — find proxies and query root contract params.
  *
  * Usage:
- *   npx tsx examples/discover.ts [mainnet|testnet]
+ *   npx tsx scripts/discover.ts [mainnet|testnet]
  */
 
 import { Address, TonClient } from '@ton/ton';

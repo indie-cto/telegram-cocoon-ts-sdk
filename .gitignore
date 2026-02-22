@@ -13,6 +13,17 @@ venv/
 dist/
 build/
 *.egg-info/
+/inference.bundle.cjs
+/setup.bundle.cjs
+/setup.cjs
+/probe-*.ts
+/probe-*.mjs
+/probe-*.cjs
+/debug-*.ts
+/debug-*.mjs
+/debug-*.cjs
+/trace-*.ts
+/trace-*.cjs
 
 # IDE
 .idea/

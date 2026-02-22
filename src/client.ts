@@ -55,6 +55,7 @@ export interface CocoonOptions {
   /**
    * If true, automatically perform on-chain long-auth registration when proxy requests it.
    * This sends a TON transaction from the mnemonic wallet.
+   * Default: true
    */
   autoRegisterOnLongAuth?: boolean;
   /** Amount in TON to attach to auto long-auth registration tx. Default: "1" */
@@ -90,6 +91,7 @@ export class Cocoon {
       network: 'mainnet',
       timeout: 120_000,
       useTls: true,
+      // Safety-first default for SDK consumers: don't submit on-chain tx implicitly.
       autoRegisterOnLongAuth: false,
       longAuthRegisterAmountTon: '1',
       ...options,

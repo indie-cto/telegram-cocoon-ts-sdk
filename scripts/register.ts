@@ -8,7 +8,7 @@
  * 4. Tops up the client contract balance
  *
  * Usage:
- *   npx tsx --env-file=.env examples/register.ts
+ *   npx tsx --env-file=.env scripts/register.ts
  *
  * Optional env vars:
  *   NETWORK=mainnet|testnet (default: mainnet)
@@ -180,7 +180,7 @@ async function main() {
   console.log(`Client SC: ${clientScAddress}`);
   console.log(`Secret: ${secret}`);
   console.log('\nYou can now run inference with:');
-  console.log(`  MNEMONIC="..." SECRET="${secret}" npx tsx examples/inference.ts`);
+  console.log(`  MNEMONIC="..." SECRET="${secret}" npx tsx scripts/inference.ts`);
 }
 
 main().catch((err) => {
